@@ -196,3 +196,105 @@ build_villain_detail <- function(games, villain_id, player_count = NULL) {
     by_player = by_player
   )
 }
+
+build_player_detail <- function(games, player_id, player_count = NULL) {
+  if (length(games) == 0 || is.null(player_id) || player_id == "") {
+    return(list(
+      summary = data.frame(
+        playerId = character(),
+        Games = integer(),
+        Wins = integer(),
+        Winrate = numeric(),
+        stringsAsFactors = FALSE
+      ),
+      by_villain = data.frame(
+        Rank = integer(),
+        VillainId = character(),
+        Games = integer(),
+        Wins = integer(),
+        Winrate = numeric(),
+        stringsAsFactors = FALSE
+      )
+    ))
+  }
+  
+  rows <- list()
+  
+  for (g in games) {
+    seats <- g$seats
+    if (is.null(seats) || !is.data.frame(seats)) next
+    
+    if (!("villainId" %in% names(seats))) {
+      if ("villain" %in% names(seats)) {
+        seats$villainId <- villain_to_id(seats$villain)
+      } else {
+        seats$villainId <- ""
+      }
+    }
+    
+    seats$player <- trimws(as.character(seats$player))
+    seats$villainId <- villain_to_id(seats$villainId)
+    seats <- seats[seats$player != "" & seats$villainId != "", c("player", "villainId"), drop = FALSE]
+    
+    n <- nrow(seats)
+    if (n < 2 || n > 6) next
+    if (!is.null(player_count) && !is.na(player_count) && n != as.integer(player_count)) next
+    
+    winnerP <- trimws(g$winnerPlayer %||% "")
+    if (!winnerP %in% seats$player) next
+    
+    idx <- which(seats$player == player_id)
+    if (length(idx) == 0) next
+    
+    for (i in idx) {
+      rows[[length(rows) + 1]] <- data.frame(
+        villainId = seats$villainId[i],
+        Games = 1L,
+        Wins = as.integer(winnerP == player_id),
+        stringsAsFactors = FALSE
+      )
+    }
+  }
+  
+  if (length(rows) == 0) {
+    return(list(
+      summary = data.frame(
+        playerId = player_id,
+        Games = 0L,
+        Wins = 0L,
+        Winrate = NA_real_,
+        stringsAsFactors = FALSE
+      ),
+      by_villain = data.frame(
+        Rank = integer(),
+        VillainId = character(),
+        Games = integer(),
+        Wins = integer(),
+        Winrate = numeric(),
+        stringsAsFactors = FALSE
+      )
+    ))
+  }
+  
+  df <- do.call(rbind, rows)
+  
+  by_villain <- aggregate(cbind(Games, Wins) ~ villainId, data = df, FUN = sum)
+  by_villain$Winrate <- ifelse(by_villain$Games > 0, by_villain$Wins / by_villain$Games, NA_real_)
+  by_villain <- by_villain[order(-by_villain$Winrate, -by_villain$Games, by_villain$villainId), , drop = FALSE]
+  by_villain$Rank <- seq_len(nrow(by_villain))
+  by_villain <- by_villain[, c("Rank", "villainId", "Games", "Wins", "Winrate")]
+  names(by_villain) <- c("Rank", "VillainId", "Games", "Wins", "Winrate")
+  
+  summary <- data.frame(
+    playerId = player_id,
+    Games = sum(df$Games),
+    Wins = sum(df$Wins),
+    Winrate = sum(df$Wins) / sum(df$Games),
+    stringsAsFactors = FALSE
+  )
+  
+  list(
+    summary = summary,
+    by_villain = by_villain
+  )
+}

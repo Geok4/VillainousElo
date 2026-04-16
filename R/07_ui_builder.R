@@ -80,22 +80,8 @@ build_ui <- function(lang, lang_button_label, selected_tab = "input") {
           layout_columns(
             fill = FALSE,
             col_widths = c(6, 6),
-            card(card_header(t("leaderboard_players")), DTOutput("playersTable")),
-            card(card_header(t("leaderboard_villains")), DTOutput("villainsTable"))
-          ),
-          
-          layout_columns(
-            fill = FALSE,
-            col_widths = c(12),
-            card(card_header(t("profile_settings")),
-                 checkboxInput("dur_norm", t("normalize_dur"), value = TRUE))
-          ),
-          
-          layout_columns(
-            fill = FALSE,
-            col_widths = c(6, 6),
-            card(card_header(t("profiles_players")), DTOutput("profilesPlayersTable")),
-            card(card_header(t("profiles_villains")), DTOutput("profilesVillainsTable"))
+            card(card_header(t("leaderboard_players")), reactableOutput("playersTable")),
+            card(card_header(t("leaderboard_villains")), reactableOutput("villainsTable"))
           ),
           
           layout_columns(
@@ -130,49 +116,74 @@ build_ui <- function(lang, lang_button_label, selected_tab = "input") {
       div(
         class = "tab-scroll",
         
-        layout_columns(
-          fill = FALSE,
-          col_widths = c(4, 4, 4),
-          
+        div(
+          class = "villain-focus-top-row",
           card(
-            class = "villain-focus-filter",
+            class = "villain-focus-filter villain-focus-top-card",
             card_header(t("villain_pick")),
-            selectizeInput(
-              "villainDetailId",
-              t("villain_pick"),
-              choices = setNames(
-                villains_tbl$villain_id,
-                if (lang == "fr") villains_tbl$villain_fr else villains_tbl$villain_en
+            div(
+              class = "villain-focus-filter-row",
+              div(
+                class = "villain-focus-filter-main",
+                selectizeInput(
+                  "villainDetailId",
+                  t("villain_pick"),
+                  choices = setNames(
+                    villains_tbl$villain_id,
+                    if (lang == "fr") villains_tbl$villain_fr else villains_tbl$villain_en
+                  ),
+                  selected = villains_tbl$villain_id[1],
+                  options = list(
+                    placeholder = t("villain_pick"),
+                    dropdownParent = "body"
+                  )
+                )
               ),
-              selected = villains_tbl$villain_id[1],
-              options = list(
-                placeholder = t("villain_pick"),
-                dropdownParent = "body"
+              div(
+                class = "villain-focus-filter-side",
+                numericInput(
+                  "villainDetailPlayerCount",
+                  t("villain_player_count"),
+                  value = 2,
+                  min = 2,
+                  max = 6,
+                  step = 1,
+                  width = "100%"
+                )
               )
-            ),
-            numericInput(
-              "villainDetailPlayerCount",
-              t("villain_player_count"),
-              value = 2,
-              min = 2,
-              max = 6,
-              step = 1,
-              width = "140px"
             )
           ),
-          
           card(
+            class = "villain-focus-kpi-card villain-focus-top-card",
             card_header(t("villain_global_winrate")),
-            div(class = "kpi", textOutput("villainDetailWinrate")),
-            div(class = "kpi-label", t("average")),
-            div(class = "kpi-rank", textOutput("villainDetailWinrateRank"))
+            div(
+              class = "villain-focus-kpi-body",
+              div(
+                class = "villain-focus-kpi-main",
+                div(class = "kpi", textOutput("villainDetailWinrate")),
+                div(class = "kpi-label", t("average"))
+              ),
+              div(
+                class = "villain-focus-kpi-side",
+                div(class = "kpi-rank", textOutput("villainDetailWinrateRank"))
+              )
+            )
           ),
-          
           card(
+            class = "villain-focus-kpi-card villain-focus-top-card",
             card_header(t("villain_times_played")),
-            div(class = "kpi", textOutput("villainDetailGames")),
-            div(class = "kpi-label", t("total")),
-            div(class = "kpi-rank", textOutput("villainDetailGamesRank"))
+            div(
+              class = "villain-focus-kpi-body",
+              div(
+                class = "villain-focus-kpi-main",
+                div(class = "kpi", textOutput("villainDetailGames")),
+                div(class = "kpi-label", t("total"))
+              ),
+              div(
+                class = "villain-focus-kpi-side",
+                div(class = "kpi-rank", textOutput("villainDetailGamesRank"))
+              )
+            )
           )
         ),
         
@@ -180,8 +191,137 @@ build_ui <- function(lang, lang_button_label, selected_tab = "input") {
           fill = FALSE,
           col_widths = c(12),
           card(
+            class = "villain-focus-players-card",
             card_header(t("villain_players_ranking")),
-            div(class = "villain-focus-table-wrap", DTOutput("villainDetailPlayersTable"))
+            div(class = "villain-focus-players-wrap", reactableOutput("villainDetailPlayersTable"))
+          )
+        ),
+
+        layout_columns(
+          fill = FALSE,
+          col_widths = c(3, 3, 6),
+          card(
+            card_header(t("villain_matchups_best")),
+            uiOutput("villainDetailBestMatchups")
+          ),
+          card(
+            card_header(t("villain_matchups_worst")),
+            uiOutput("villainDetailWorstMatchups")
+          ),
+          card(
+            card_header(t("villain_matchups_table")),
+            div(class = "villain-focus-table-wrap", reactableOutput("villainDetailMatchupsTable"))
+          )
+        )
+      )
+    ),
+    
+    nav_panel(
+      t("tab_player_focus"), value = "player_focus",
+      div(
+        class = "tab-scroll",
+        
+        div(
+          class = "villain-focus-top-row",
+          card(
+            class = "villain-focus-filter villain-focus-top-card",
+            card_header(t("player_pick")),
+            div(
+              class = "villain-focus-filter-row",
+              div(
+                class = "villain-focus-filter-main",
+                selectizeInput(
+                  "playerDetailId",
+                  t("player_pick"),
+                  choices = character(),
+                  selected = NULL,
+                  options = list(
+                    placeholder = t("player_pick"),
+                    dropdownParent = "body"
+                  )
+                )
+              ),
+              div(
+                class = "villain-focus-filter-side",
+                numericInput(
+                  "playerDetailPlayerCount",
+                  t("player_focus_player_count"),
+                  value = 2,
+                  min = 2,
+                  max = 6,
+                  step = 1,
+                  width = "100%"
+                )
+              )
+            )
+          ),
+          card(
+            class = "villain-focus-kpi-card villain-focus-top-card",
+            card_header(t("player_global_winrate")),
+            div(
+              class = "villain-focus-kpi-body",
+              div(
+                class = "villain-focus-kpi-main",
+                div(class = "kpi", textOutput("playerDetailWinrate")),
+                div(class = "kpi-label", t("average"))
+              ),
+              div(
+                class = "villain-focus-kpi-side",
+                div(class = "kpi-rank", textOutput("playerDetailWinrateRank"))
+              )
+            )
+          ),
+          card(
+            class = "villain-focus-kpi-card villain-focus-top-card",
+            card_header(t("player_times_played")),
+            div(
+              class = "villain-focus-kpi-body",
+              div(
+                class = "villain-focus-kpi-main",
+                div(class = "kpi", textOutput("playerDetailGames")),
+                div(class = "kpi-label", t("total"))
+              ),
+              div(
+                class = "villain-focus-kpi-side",
+                div(class = "kpi-rank", textOutput("playerDetailGamesRank"))
+              )
+            )
+          )
+        ),
+        
+        layout_columns(
+          fill = FALSE,
+          col_widths = c(3, 3, 6),
+          card(
+            card_header(t("player_villains_best")),
+            uiOutput("playerDetailBestVillains")
+          ),
+          card(
+            card_header(t("player_villains_worst")),
+            uiOutput("playerDetailWorstVillains")
+          ),
+          card(
+            class = "villain-focus-players-card",
+            card_header(t("player_villains_ranking")),
+            div(class = "villain-focus-players-wrap", reactableOutput("playerDetailVillainsTable"))
+          )
+        ),
+        
+        layout_columns(
+          fill = FALSE,
+          col_widths = c(3, 3, 6),
+          card(
+            card_header(t("player_matchups_best")),
+            uiOutput("playerDetailBestMatchups")
+          ),
+          card(
+            card_header(t("player_matchups_worst")),
+            uiOutput("playerDetailWorstMatchups")
+          ),
+          card(
+            class = "villain-focus-players-card",
+            card_header(t("player_matchups_table")),
+            div(class = "villain-focus-table-wrap", reactableOutput("playerDetailMatchupsTable"))
           )
         )
       )
@@ -212,7 +352,7 @@ build_ui <- function(lang, lang_button_label, selected_tab = "input") {
             
             div(
               style = "display:flex; flex-direction:column; gap:12px;",
-              card(card_header(t("mu_table")), DTOutput("matchupTable")),
+              card(card_header(t("mu_table")), reactableOutput("matchupTable")),
               card(card_header(t("mu_heatmap")), plotOutput("matchupHeatmap", height = 560))
             )
           )
@@ -237,7 +377,7 @@ build_ui <- function(lang, lang_button_label, selected_tab = "input") {
             
             card(
               card_header(t("pred_results")),
-              DTOutput("predTable"),
+              reactableOutput("predTable"),
               hr(),
               card_header(t("pred_plot")),
               plotOutput("predPlot", height = 420)
@@ -252,7 +392,7 @@ build_ui <- function(lang, lang_button_label, selected_tab = "input") {
           layout_columns(
             fill = FALSE,
             col_widths = c(6, 6),
-            card(card_header(t("data_history")), DTOutput("historyTable")),
+            card(card_header(t("data_history")), reactableOutput("historyTable")),
             card(
               card_header(t("edit_game")),
               tags$p(class = "small-muted", "Select a game, edit, then apply. You can also delete."),

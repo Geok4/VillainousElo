@@ -157,13 +157,289 @@ input[type='checkbox']{
 .kpi-label { opacity: .75; margin-top: 6px; font-size: 12px; }
 .kpi-rank { margin-top: 8px; color: var(--app-gold-2); font-size: 12.5px; font-weight: 700; }
 
-.villain-focus-filter .form-group { margin-bottom: 12px; }
-.villain-focus-filter .selectize-control { margin-bottom: 8px; }
+.villain-focus-filter { min-height: 0 !important; }
+.villain-focus-top-row {
+  max-width: 1180px;
+  margin: 0 auto 18px auto;
+  display: grid;
+  grid-template-columns: minmax(340px, 1.5fr) minmax(220px, 1fr) minmax(220px, 1fr);
+  gap: 18px;
+  align-items: stretch;
+}
+.villain-focus-top-card {
+  width: 100%;
+  margin: 0;
+}
+.villain-focus-filter .card-body,
+.villain-focus-kpi-card .card-body {
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+.villain-focus-filter-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 132px;
+  gap: 12px;
+  align-items: end;
+}
+.villain-focus-filter .form-group { margin-bottom: 0; }
+.villain-focus-filter .selectize-control { margin-bottom: 0; }
+.villain-focus-filter-side .shiny-input-container,
+.villain-focus-filter-main .shiny-input-container {
+  margin-bottom: 0;
+}
+.villain-focus-kpi-card { min-height: 0 !important; }
+.villain-focus-kpi-body {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px 10px;
+  align-items: center;
+  min-height: 70px;
+}
+.villain-focus-kpi-main,
+.villain-focus-kpi-side {
+  min-width: 0;
+}
+.villain-focus-kpi-side {
+  text-align: right;
+}
+.villain-focus-kpi-card .kpi {
+  font-size: 24px;
+  margin: 0;
+}
+.villain-focus-kpi-card .kpi-label {
+  margin-top: 2px;
+}
+.villain-focus-kpi-card .kpi-rank {
+  margin-top: 0;
+  white-space: nowrap;
+  font-size: 11.5px;
+}
 .villain-focus-table-wrap {
   max-width: 980px;
   margin: 0 auto;
 }
 .villain-focus-table-wrap table.dataTable { width: 100% !important; }
+.villain-focus-players-card {
+  max-width: 860px;
+  margin: 0 auto;
+}
+.villain-focus-players-wrap {
+  max-width: 620px;
+  margin: 0 auto;
+}
+.villain-focus-players-wrap table.dataTable { width: 100% !important; }
+.villain-focus-players-wrap .dataTables_wrapper {
+  font-size: 12px;
+}
+.villain-focus-players-wrap table.dataTable thead th {
+  font-size: 11px;
+  letter-spacing: 0.4px;
+  padding: 8px 10px !important;
+}
+.villain-focus-players-wrap table.dataTable tbody td {
+  padding: 7px 10px !important;
+  border-top: 1px solid rgba(24, 70, 61, 0.55) !important;
+}
+.villain-focus-players-wrap table.dataTable tbody tr {
+  background-color: rgba(10, 16, 24, 0.82) !important;
+}
+.villain-focus-players-wrap table.dataTable tbody tr:nth-child(odd) {
+  background-color: rgba(12, 20, 30, 0.92) !important;
+}
+.villain-focus-players-wrap .dataTables_length,
+.villain-focus-players-wrap .dataTables_filter {
+  margin-bottom: 8px;
+}
+.villain-focus-players-wrap .dataTables_filter input,
+.villain-focus-players-wrap .dataTables_length select {
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-size: 11px;
+}
+.villain-focus-players-wrap .dataTables_info {
+  font-size: 11px;
+  padding-top: 6px !important;
+}
+.villain-focus-players-wrap .dataTables_wrapper .dataTables_paginate .paginate_button {
+  min-width: 22px !important;
+  padding: 2px 6px !important;
+  font-size: 10px !important;
+  line-height: 1.2 !important;
+  border-radius: 6px !important;
+  margin: 0 1px !important;
+  background: rgba(255,255,255,.03) !important;
+  border: 1px solid rgba(255,255,255,.08) !important;
+  box-shadow: none !important;
+  color: #d7e6ef !important;
+}
+.villain-focus-players-wrap .dataTables_wrapper .dataTables_paginate .paginate_button:hover {
+  background: rgba(255,255,255,.06) !important;
+  border: 1px solid rgba(255,255,255,.12) !important;
+  color: #ffffff !important;
+}
+.villain-focus-players-wrap .dataTables_wrapper .dataTables_paginate .paginate_button.current {
+  background: rgba(47,125,75,.18) !important;
+  border: 1px solid rgba(47,125,75,.22) !important;
+  color: #f6fbff !important;
+}
+.villain-focus-players-wrap .dataTables_wrapper .dataTables_paginate .paginate_button.current:hover {
+  background: rgba(47,125,75,.22) !important;
+  border: 1px solid rgba(47,125,75,.28) !important;
+}
+.villain-focus-players-wrap .dataTables_wrapper .dataTables_paginate .paginate_button.disabled,
+.villain-focus-players-wrap .dataTables_wrapper .dataTables_paginate .paginate_button.disabled:hover {
+  background: rgba(255,255,255,.02) !important;
+  border: 1px solid rgba(255,255,255,.05) !important;
+  color: rgba(215,230,239,.45) !important;
+  cursor: default !important;
+}
+.villain-focus-players-wrap .dataTables_wrapper .dataTables_paginate {
+  padding-top: 2px !important;
+}
+.villain-matchup-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+.villain-matchup-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.villain-matchup-empty {
+  padding: 18px;
+  border-radius: 14px;
+  background: rgba(255,255,255,0.03);
+  border: 1px dashed rgba(216,197,138,0.28);
+  color: #cfe0ff;
+}
+.villain-matchup-card {
+  position: relative;
+  overflow: hidden;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(216,197,138,0.24);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), 0 12px 28px rgba(0,0,0,0.22);
+  width: 100%;
+  display: flex;
+  align-items: center;
+}
+.villain-matchup-card.is-rank-1 {
+  width: 100%;
+  min-height: 96px;
+}
+.villain-matchup-card.is-rank-2 {
+  padding: 9px 11px;
+  border-radius: 13px;
+  width: 100%;
+  min-height: 78px;
+}
+.villain-matchup-card.is-rank-3 {
+  padding: 8px 10px;
+  border-radius: 12px;
+  opacity: 0.95;
+  width: 100%;
+  min-height: 64px;
+}
+.villain-matchup-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at top right, rgba(255,255,255,0.12), transparent 45%);
+  pointer-events: none;
+}
+.villain-matchup-card.best {
+  background: linear-gradient(135deg, rgba(47,125,75,0.34), rgba(8,22,14,0.92));
+}
+.villain-matchup-card.worst {
+  background: linear-gradient(135deg, rgba(120,36,24,0.42), rgba(18,8,8,0.94));
+}
+.villain-matchup-rank {
+  font-size: 11px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--app-gold-2);
+  opacity: 0.92;
+}
+.villain-matchup-layout {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) 92px 72px 88px;
+  gap: 4px 12px;
+  align-items: center;
+  width: 100%;
+}
+.villain-matchup-main {
+  min-width: 0;
+  align-self: center;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.villain-matchup-stats {
+  display: grid;
+  grid-template-columns: 92px 72px 88px;
+  gap: 4px 12px;
+  align-items: end;
+  grid-column: 2 / 5;
+}
+.villain-matchup-stat {
+  min-width: 0;
+  text-align: left;
+}
+.villain-matchup-stat-label {
+  font-size: 9px;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--app-gold-2);
+  opacity: 0.88;
+  white-space: nowrap;
+}
+.villain-matchup-stat-value {
+  margin-top: 1px;
+  font-size: 13px;
+  font-weight: 800;
+  color: #f4f7fb;
+  white-space: nowrap;
+}
+.villain-matchup-name {
+  margin-top: 2px;
+  font-size: 18px;
+  font-weight: 900;
+  line-height: 1.1;
+}
+.villain-matchup-card.is-rank-2 .villain-matchup-name { font-size: 16px; }
+.villain-matchup-card.is-rank-3 .villain-matchup-name { font-size: 15px; }
+.villain-matchup-winrate {
+  margin-top: 0;
+  font-size: 16px;
+  font-weight: 900;
+  line-height: 1;
+  white-space: nowrap;
+}
+.villain-matchup-card.is-rank-2 .villain-matchup-winrate { font-size: 15px; }
+.villain-matchup-card.is-rank-3 .villain-matchup-winrate { font-size: 14px; }
+.villain-matchup-meta {
+  margin-top: 0;
+  color: #d9e5f8;
+  opacity: 0.88;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.villain-matchup-card.is-rank-2 .villain-matchup-meta { font-size: 10px; }
+.villain-matchup-card.is-rank-3 .villain-matchup-meta { font-size: 9px; }
+.villain-matchup-caption {
+  margin-top: 0;
+  color: var(--app-gold-2);
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.villain-matchup-card.is-rank-2 .villain-matchup-caption { font-size: 10px; }
+.villain-matchup-card.is-rank-3 .villain-matchup-caption { font-size: 9px; }
+.villain-matchup-card.is-rank-2 .villain-matchup-stat-value { font-size: 12px; }
+.villain-matchup-card.is-rank-3 .villain-matchup-stat-value { font-size: 11px; }
+.villain-matchup-card.is-rank-2 .villain-matchup-stat-label { font-size: 9px; }
+.villain-matchup-card.is-rank-3 .villain-matchup-stat-label { font-size: 8px; }
 
 /* Badges */
 .badge-soft {
