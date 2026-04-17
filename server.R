@@ -41,7 +41,7 @@ server <- function(input, output, session) {
   dataMsg <- reactiveVal("")
   predMsg <- reactiveVal("")
   
-  elo_cfg <- reactiveValues(baseRating = 0, k = 32, alpha = 0.7, scale = 400)
+  elo_cfg <- reactiveValues(baseRating = 0, k = 32, alpha = 0.5, scale = 400)
   
   observeEvent(input$openElo, {
     showModal(modalDialog(
@@ -65,7 +65,7 @@ server <- function(input, output, session) {
   observeEvent(input$saveElo, {
     elo_cfg$baseRating <- as.integer(input$m_baseRating %||% 0)
     elo_cfg$k <- as.numeric(input$m_k %||% 32)
-    elo_cfg$alpha <- as.numeric(input$m_alpha %||% 0.7)
+    elo_cfg$alpha <- as.numeric(input$m_alpha %||% 0.5)
     elo_cfg$scale <- as.numeric(input$m_scale %||% 400)
     removeModal()
     showNotification(tr("notif_elo_applied"), type = "message", duration = 2.5)
@@ -80,8 +80,7 @@ server <- function(input, output, session) {
   villain_choices_named <- reactive({
     lang <- currentLang()
     ids <- available_villain_ids()
-    labels <- vapply(ids, label_villain, character(1), lang = lang)
-    setNames(ids, labels)
+    villain_choices_html(ids, lang = lang, size = 22)
   })
   
   set_choices_named <- reactive({
@@ -135,7 +134,7 @@ server <- function(input, output, session) {
       
       v_choices2 <- v_choices
       if (!is.null(current_v) && current_v != "" && !(current_v %in% v_choices2)) {
-        v_choices2 <- c(v_choices2, setNames(current_v, label_villain(current_v, currentLang())))
+        v_choices2 <- c(v_choices2, setNames(current_v, villain_label_html(current_v, currentLang(), size = 22, compact = TRUE)))
       }
       
       div(
@@ -158,6 +157,7 @@ server <- function(input, output, session) {
             options = list(
               create = FALSE,
               dropdownParent = "body",
+              render = villain_selectize_render,
               placeholder = if (currentLang() == "fr") "Choisir un Vilain" else "Select a Villain"
             )
           )
@@ -256,9 +256,13 @@ server <- function(input, output, session) {
     if (nrow(top) == 0) return(tags$div(class = "small-muted", tr("not_enough_data")))
     classes <- c("trophy-1", "trophy-2", "trophy-3")
     tagList(lapply(seq_len(nrow(top)), function(i) {
-      tags$span(class = "badge-soft",
-                tags$span(class = classes[i], icon("trophy")),
-                paste0("#", i, " ", label_villain(top$key[i], lang), " — ", top$Elo[i]))
+      tags$span(
+        class = "badge-soft badge-soft-villain",
+        tags$span(class = classes[i], icon("trophy")),
+        tags$span(class = "badge-soft-rank", paste0("#", i)),
+        villain_label_tag(top$key[i], lang = lang, size = 24, compact = TRUE),
+        tags$span(class = "badge-soft-score", paste0("Elo ", top$Elo[i]))
+      )
     }))
   })
   
@@ -383,7 +387,7 @@ server <- function(input, output, session) {
         AvgWin = colDef(align = "right"),
         AvgLoss = colDef(align = "right")
       ),
-      default_sorted = "Elo"
+      default_sorted = list(Elo = "desc")
     )
   })
   
@@ -405,7 +409,7 @@ server <- function(input, output, session) {
     } else {
       shown <- data.frame(
         key = df$key,
-        Name = vapply(df$key, label_villain, character(1), lang = lang),
+        Name = vapply(df$key, villain_label_html, character(1), lang = lang, size = 28, compact = TRUE),
         Elo = df$Elo,
         Games = df$Games,
         stringsAsFactors = FALSE
@@ -436,14 +440,14 @@ server <- function(input, output, session) {
       shown,
       page_size = 12,
       columns = list(
-        Name = colDef(align = "left"),
+        Name = colDef(align = "left", html = TRUE),
         Elo = colDef(align = "right"),
         Games = colDef(align = "right"),
         Winrate = colDef(align = "right"),
         AvgWin = colDef(align = "right"),
         AvgLoss = colDef(align = "right")
       ),
-      default_sorted = "Elo"
+      default_sorted = list(Elo = "desc")
     )
   })
   
@@ -501,7 +505,7 @@ server <- function(input, output, session) {
     elo <- vr[v$key]; elo[is.na(elo)] <- elo_cfg$baseRating
     
     shown <- data.frame(
-      Villain = vapply(v$key, label_villain, character(1), lang = lang),
+      Villain = vapply(v$key, villain_label_html, character(1), lang = lang, size = 28, compact = TRUE),
       Elo = as.integer(round(elo)),
       Games = v$Games,
       Winrate = format_pct_label(v$Winrate),
@@ -514,7 +518,7 @@ server <- function(input, output, session) {
       shown,
       page_size = 12,
       columns = list(
-        Villain = colDef(align = "left"),
+        Villain = colDef(align = "left", html = TRUE),
         Elo = colDef(align = "right"),
         Games = colDef(align = "right"),
         Winrate = colDef(align = "right")
@@ -548,9 +552,32 @@ server <- function(input, output, session) {
     updateSelectizeInput(
       session, "villainDetailId",
       label = tr("villain_pick"),
-      choices = setNames(ids, vapply(ids, label_villain, character(1), lang = lang)),
+      choices = villain_choices_html(ids, lang = lang, size = 26),
       selected = current_sel,
       server = FALSE
+    )
+  })
+
+  output$villainDetailHero <- renderUI({
+    vid <- input$villainDetailId %||% villains_tbl$villain_id[1]
+    lang <- currentLang()
+    src <- villain_image_src(vid)
+    label <- label_villain(vid, lang)
+    tags$div(
+      class = "villain-focus-hero-card",
+      if (!is.null(src)) {
+        tags$span(
+          class = "villain-focus-hero-avatar-shell",
+          tags$img(
+            src = src,
+            alt = label,
+            class = "villain-focus-hero-avatar"
+          )
+        )
+      } else {
+        tags$div(class = "villain-focus-hero-avatar-shell")
+      },
+      tags$div(class = "villain-focus-hero-name", label)
     )
   })
 
@@ -1043,7 +1070,7 @@ server <- function(input, output, session) {
 
     shown <- data.frame(
       Rank = df$Rank,
-      Villain = vapply(df$VillainId, label_villain, character(1), lang = lang),
+      Villain = vapply(df$VillainId, villain_label_html, character(1), lang = lang, size = 28, compact = TRUE),
       Games = df$Games,
       Wins = df$Wins,
       Winrate = paste0(round(df$Winrate * 100, 1), " %"),
@@ -1078,7 +1105,7 @@ server <- function(input, output, session) {
       columns = stats::setNames(
         list(
           colDef(align = "center"),
-          colDef(align = "left"),
+          colDef(align = "left", html = TRUE),
           colDef(align = "right"),
           colDef(align = "right"),
           colDef(align = "right")
@@ -1152,7 +1179,10 @@ server <- function(input, output, session) {
             tags$div(
               class = "villain-matchup-main",
               tags$div(class = "villain-matchup-rank", labels[i]),
-              tags$div(class = "villain-matchup-name", label_fn(row$OpponentId, lang))
+              tags$div(
+                class = "villain-matchup-name",
+                if (length(formals(label_fn)) >= 3) label_fn(row$OpponentId, lang, i) else label_fn(row$OpponentId, lang)
+              )
             ),
             tags$div(
               class = "villain-matchup-stats",
@@ -1201,7 +1231,7 @@ server <- function(input, output, session) {
       villain_focus_matchups(),
       mode = "best",
       empty_text = tr("villain_matchups_none"),
-      label_fn = label_villain
+      label_fn = function(id, lang, rank) villain_label_tag(id, lang, size = 34, compact = TRUE)
     )
   })
 
@@ -1210,7 +1240,7 @@ server <- function(input, output, session) {
       villain_focus_matchups(),
       mode = "worst",
       empty_text = tr("villain_matchups_none"),
-      label_fn = label_villain
+      label_fn = function(id, lang, rank) villain_label_tag(id, lang, size = 34, compact = TRUE)
     )
   })
 
@@ -1234,14 +1264,14 @@ server <- function(input, output, session) {
         empty_df,
         page_size = 12,
         columns = list(
-          Adversaire = colDef(align = "left"),
-          Opponent = colDef(align = "left")
+          Adversaire = colDef(align = "left", html = TRUE),
+          Opponent = colDef(align = "left", html = TRUE)
         )
       ))
     }
     
     shown <- data.frame(
-      Opponent = vapply(df$OpponentId, label_villain, character(1), lang = lang),
+      Opponent = vapply(df$OpponentId, villain_label_html, character(1), lang = lang, size = 28, compact = TRUE),
       H2HGames = df$H2HGames,
       GamesTogether = df$GamesTogether,
       Wins = df$Wins,
@@ -1253,8 +1283,8 @@ server <- function(input, output, session) {
       shown,
       page_size = 12,
       columns = list(
-        Adversaire = colDef(align = "left"),
-        Opponent = colDef(align = "left"),
+        Adversaire = colDef(align = "left", html = TRUE),
+        Opponent = colDef(align = "left", html = TRUE),
         `Parties H2H` = colDef(align = "right"),
         `Parties ensemble` = colDef(align = "right"),
         Victoires = colDef(align = "right"),
@@ -1271,7 +1301,7 @@ server <- function(input, output, session) {
       player_focus_matchups(),
       mode = "best",
       empty_text = tr("player_matchups_none"),
-      label_fn = label_villain
+      label_fn = function(id, lang, rank) villain_label_tag(id, lang, size = 34, compact = TRUE)
     )
   })
 
@@ -1280,7 +1310,7 @@ server <- function(input, output, session) {
       player_focus_villains_cards(),
       mode = "best",
       empty_text = tr("player_matchups_none"),
-      label_fn = label_villain
+      label_fn = function(id, lang, rank) villain_label_tag(id, lang, size = 34, compact = TRUE)
     )
   })
 
@@ -1289,7 +1319,7 @@ server <- function(input, output, session) {
       player_focus_villains_cards(),
       mode = "worst",
       empty_text = tr("player_matchups_none"),
-      label_fn = label_villain
+      label_fn = function(id, lang, rank) villain_label_tag(id, lang, size = 34, compact = TRUE)
     )
   })
 
@@ -1298,7 +1328,7 @@ server <- function(input, output, session) {
       player_focus_matchups(),
       mode = "worst",
       empty_text = tr("player_matchups_none"),
-      label_fn = label_villain
+      label_fn = function(id, lang, rank) villain_label_tag(id, lang, size = 34, compact = TRUE)
     )
   })
 
@@ -1322,14 +1352,14 @@ server <- function(input, output, session) {
         empty_df,
         page_size = 12,
         columns = list(
-          Adversaire = colDef(align = "left"),
-          Opponent = colDef(align = "left")
+          Adversaire = colDef(align = "left", html = TRUE),
+          Opponent = colDef(align = "left", html = TRUE)
         )
       ))
     }
 
     shown <- data.frame(
-      Opponent = vapply(df$OpponentId, label_villain, character(1), lang = lang),
+      Opponent = vapply(df$OpponentId, villain_label_html, character(1), lang = lang, size = 28, compact = TRUE),
       H2HGames = df$H2HGames,
       GamesTogether = df$GamesTogether,
       Wins = df$Wins,
@@ -1341,8 +1371,8 @@ server <- function(input, output, session) {
       shown,
       page_size = 12,
       columns = list(
-        Adversaire = colDef(align = "left"),
-        Opponent = colDef(align = "left"),
+        Adversaire = colDef(align = "left", html = TRUE),
+        Opponent = colDef(align = "left", html = TRUE),
         `Parties H2H` = colDef(align = "right"),
         `Parties ensemble` = colDef(align = "right"),
         Victoires = colDef(align = "right"),
@@ -1436,9 +1466,19 @@ server <- function(input, output, session) {
       )
     } else {
       ids <- sort(unique(names(elo_res()$villainRatings)))
-      ch <- setNames(ids, vapply(ids, label_villain, character(1), lang = lang))
+      ch <- villain_choices_html(ids, lang = lang, size = 24)
       output$timelineNameUI <- renderUI(
-        selectInput("timelineName", tr("name"), choices = ch, selected = if (length(ids) > 0) ids[1] else NULL)
+        selectizeInput(
+          "timelineName",
+          tr("name"),
+          choices = ch,
+          selected = if (length(ids) > 0) ids[1] else NULL,
+          options = list(
+            create = FALSE,
+            dropdownParent = "body",
+            render = villain_selectize_render
+          )
+        )
       )
     }
   })
@@ -1485,9 +1525,19 @@ server <- function(input, output, session) {
       )
     } else {
       ids <- sort(unique(log_df$villainId))
-      ch <- setNames(ids, vapply(ids, label_villain, character(1), lang = lang))
+      ch <- villain_choices_html(ids, lang = lang, size = 24)
       output$durNameUI <- renderUI(
-        selectInput("durName", tr("name"), choices = ch, selected = if (length(ids) > 0) ids[1] else NULL)
+        selectizeInput(
+          "durName",
+          tr("name"),
+          choices = ch,
+          selected = if (length(ids) > 0) ids[1] else NULL,
+          options = list(
+            create = FALSE,
+            dropdownParent = "body",
+            render = villain_selectize_render
+          )
+        )
       )
     }
   })
@@ -1652,17 +1702,17 @@ server <- function(input, output, session) {
         empty_df,
         page_size = 12,
         columns = list(
-          Vilain = colDef(align = "left"),
-          Adversaire = colDef(align = "left"),
-          Villain = colDef(align = "left"),
-          Opponent = colDef(align = "left")
+          Vilain = colDef(align = "left", html = TRUE),
+          Adversaire = colDef(align = "left", html = TRUE),
+          Villain = colDef(align = "left", html = TRUE),
+          Opponent = colDef(align = "left", html = TRUE)
         )
       ))
     }
     
     shown <- data.frame(
-      Villain = vapply(df$VillainId, label_villain, character(1), lang = lang),
-      Opponent = vapply(df$OpponentId, label_villain, character(1), lang = lang),
+      Villain = vapply(df$VillainId, villain_label_html, character(1), lang = lang, size = 28, compact = TRUE),
+      Opponent = vapply(df$OpponentId, villain_label_html, character(1), lang = lang, size = 28, compact = TRUE),
       GamesTogether = df$GamesTogether,
       H2HGames = df$H2HGames,
       Winrate = format_pct_label(df$Winrate),
@@ -1673,10 +1723,10 @@ server <- function(input, output, session) {
       shown,
       page_size = 12,
       columns = list(
-        Vilain = colDef(align = "left"),
-        Adversaire = colDef(align = "left"),
-        Villain = colDef(align = "left"),
-        Opponent = colDef(align = "left"),
+        Vilain = colDef(align = "left", html = TRUE),
+        Adversaire = colDef(align = "left", html = TRUE),
+        Villain = colDef(align = "left", html = TRUE),
+        Opponent = colDef(align = "left", html = TRUE),
         `Parties ensemble` = colDef(align = "right"),
         `Parties H2H` = colDef(align = "right"),
         GamesTogether = colDef(align = "right"),
@@ -1815,7 +1865,7 @@ server <- function(input, output, session) {
       
       v_choices2 <- v_choices
       if (!is.null(cv) && cv != "" && !(cv %in% v_choices2)) {
-        v_choices2 <- c(v_choices2, setNames(cv, label_villain(cv, currentLang())))
+        v_choices2 <- c(v_choices2, setNames(cv, villain_label_html(cv, currentLang(), size = 22, compact = TRUE)))
       }
       
       div(
@@ -1828,7 +1878,7 @@ server <- function(input, output, session) {
                          options = list(create = TRUE, persist = TRUE, createOnBlur = TRUE, dropdownParent = "body")),
           selectizeInput(vid, paste0("Villain #", i),
                          choices = v_choices2, selected = cv,
-                         options = list(create = FALSE, dropdownParent = "body"))
+                         options = list(create = FALSE, dropdownParent = "body", render = villain_selectize_render))
         )
       )
     }))
@@ -1861,6 +1911,7 @@ server <- function(input, output, session) {
     data.frame(
       Seat = paste0("#", seq_len(n)),
       Player = players,
+      VillainId = villains,
       Villain = vapply(villains, label_villain, character(1), lang = currentLang()),
       Elo_Player = as.integer(round(eloP)),
       Elo_Villain = as.integer(round(eloV)),
@@ -1878,18 +1929,20 @@ server <- function(input, output, session) {
         page_size = 10,
         columns = list(
           Player = colDef(align = "left"),
-          Villain = colDef(align = "left")
+          Villain = colDef(align = "left", html = TRUE)
         )
       ))
     }
     shown <- df
+    shown$Villain <- vapply(shown$VillainId, villain_label_html, character(1), lang = currentLang(), size = 26, compact = TRUE)
+    shown$VillainId <- NULL
     shown$Prob_pct <- paste0(shown$Prob_pct, " %")
     build_reactable(
       shown,
       page_size = 10,
       columns = list(
         Player = colDef(align = "left"),
-        Villain = colDef(align = "left"),
+        Villain = colDef(align = "left", html = TRUE),
         Elo_Player = colDef(align = "right"),
         Elo_Villain = colDef(align = "right"),
         Elo_Total = colDef(align = "right"),
@@ -1950,7 +2003,7 @@ server <- function(input, output, session) {
       Date = sapply(g, `[[`, "playedAt"),
       DurationMin = suppressWarnings(as.integer(sapply(g, function(x) x$durationMin %||% NA_integer_))),
       Winner = sapply(g, `[[`, "winnerPlayer"),
-      Seats = sapply(g, function(x) paste0(x$seats$player, " (", vapply(x$seats$villainId, label_villain, character(1), lang = lang), ")", collapse = ", ")),
+      Seats = sapply(g, function(x) paste0(x$seats$player, " (", vapply(x$seats$villainId, villain_label_html, character(1), lang = lang, size = 20, compact = TRUE), ")", collapse = ", ")),
       stringsAsFactors = FALSE
     )
     df <- df[order(df$Date, decreasing = TRUE), , drop = FALSE]
@@ -1959,7 +2012,7 @@ server <- function(input, output, session) {
       page_size = 10,
       columns = list(
         Winner = colDef(align = "left"),
-        Seats = colDef(align = "left"),
+        Seats = colDef(align = "left", html = TRUE),
         DurationMin = colDef(align = "right")
       )
     )
@@ -2088,7 +2141,7 @@ server <- function(input, output, session) {
       
       v_choices2 <- v_choices
       if (!is.null(cur_v) && cur_v != "" && !(cur_v %in% v_choices2)) {
-        v_choices2 <- c(v_choices2, setNames(cur_v, label_villain(cur_v, lang)))
+        v_choices2 <- c(v_choices2, setNames(cur_v, villain_label_html(cur_v, lang, size = 22, compact = TRUE)))
       }
       
       div(
@@ -2101,7 +2154,7 @@ server <- function(input, output, session) {
                          options = list(create = TRUE, persist = TRUE, createOnBlur = TRUE, dropdownParent = "body")),
           selectizeInput(vid, paste0("Villain #", i),
                          choices = v_choices2, selected = cur_v,
-                         options = list(create = FALSE, dropdownParent = "body"))
+                         options = list(create = FALSE, dropdownParent = "body", render = villain_selectize_render))
         )
       )
     }))

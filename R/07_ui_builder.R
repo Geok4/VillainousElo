@@ -117,38 +117,43 @@ build_ui <- function(lang, lang_button_label, selected_tab = "input") {
         class = "tab-scroll",
         
         div(
-          class = "villain-focus-top-row",
+          class = "villain-focus-top-row villain-focus-top-row--villain",
           card(
             class = "villain-focus-filter villain-focus-top-card",
             card_header(t("villain_pick")),
             div(
-              class = "villain-focus-filter-row",
+              class = "villain-focus-filter-layout",
               div(
-                class = "villain-focus-filter-main",
-                selectizeInput(
-                  "villainDetailId",
-                  t("villain_pick"),
-                  choices = setNames(
-                    villains_tbl$villain_id,
-                    if (lang == "fr") villains_tbl$villain_fr else villains_tbl$villain_en
-                  ),
-                  selected = villains_tbl$villain_id[1],
-                  options = list(
-                    placeholder = t("villain_pick"),
-                    dropdownParent = "body"
-                  )
-                )
+                class = "villain-focus-hero",
+                uiOutput("villainDetailHero")
               ),
               div(
-                class = "villain-focus-filter-side",
-                numericInput(
-                  "villainDetailPlayerCount",
-                  t("villain_player_count"),
-                  value = 2,
-                  min = 2,
-                  max = 6,
-                  step = 1,
-                  width = "100%"
+                class = "villain-focus-filter-row",
+                div(
+                  class = "villain-focus-filter-main",
+                  selectizeInput(
+                    "villainDetailId",
+                    t("villain_pick"),
+                    choices = villain_choices_html(villains_tbl$villain_id, lang = lang, size = 26),
+                    selected = villains_tbl$villain_id[1],
+                    options = list(
+                      placeholder = t("villain_pick"),
+                      dropdownParent = "body",
+                      render = villain_selectize_render
+                    )
+                  )
+                ),
+                div(
+                  class = "villain-focus-filter-side",
+                  numericInput(
+                    "villainDetailPlayerCount",
+                    t("villain_player_count"),
+                    value = 2,
+                    min = 2,
+                    max = 6,
+                    step = 1,
+                    width = "100%"
+                  )
                 )
               )
             )
@@ -184,14 +189,9 @@ build_ui <- function(lang, lang_button_label, selected_tab = "input") {
                 div(class = "kpi-rank", textOutput("villainDetailGamesRank"))
               )
             )
-          )
-        ),
-        
-        layout_columns(
-          fill = FALSE,
-          col_widths = c(12),
+          ),
           card(
-            class = "villain-focus-players-card",
+            class = "villain-focus-players-card villain-focus-top-card",
             card_header(t("villain_players_ranking")),
             div(class = "villain-focus-players-wrap", reactableOutput("villainDetailPlayersTable"))
           )

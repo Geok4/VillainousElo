@@ -157,14 +157,87 @@ input[type='checkbox']{
 .kpi-label { opacity: .75; margin-top: 6px; font-size: 12px; }
 .kpi-rank { margin-top: 8px; color: var(--app-gold-2); font-size: 12.5px; font-weight: 700; }
 
+.villain-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  vertical-align: middle;
+}
+.villain-inline-compact {
+  gap: 8px;
+}
+.villain-inline-label {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  line-height: 1.1;
+}
+.villain-avatar-shell {
+  flex: 0 0 auto;
+  overflow: hidden;
+  border-radius: 50%;
+  border: 1px solid rgba(216,197,138,0.38);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.28);
+  background: rgba(255,255,255,0.04);
+}
+.villain-avatar {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  object-position: center;
+  transform: scale(1.40);
+  transform-origin: center;
+}
+.selectize-control.single .selectize-input {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+}
+.selectize-control.single .selectize-input > .item,
+.selectize-control.single .selectize-input > input {
+  display: inline-flex !important;
+  align-items: center;
+  min-height: 26px;
+}
+.villain-selectize-entry {
+  display: flex;
+  align-items: center;
+  min-height: 100%;
+}
+.villain-selectize-entry .villain-inline {
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+.selectize-input .villain-selectize-entry,
+.selectize-dropdown-content .villain-selectize-entry {
+  min-height: 30px;
+}
+.selectize-input .villain-inline-label,
+.selectize-dropdown-content .villain-inline-label {
+  display: inline-flex;
+  align-items: center;
+}
+.selectize-input .villain-avatar-shell,
+.selectize-dropdown-content .villain-avatar-shell {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
 .villain-focus-filter { min-height: 0 !important; }
 .villain-focus-top-row {
-  max-width: 1180px;
+  max-width: 1500px;
   margin: 0 auto 18px auto;
   display: grid;
-  grid-template-columns: minmax(340px, 1.5fr) minmax(220px, 1fr) minmax(220px, 1fr);
+  grid-template-columns: minmax(360px, 1.45fr) minmax(360px, 1.25fr) minmax(170px, 0.6fr) minmax(170px, 0.6fr);
   gap: 18px;
   align-items: stretch;
+}
+.villain-focus-top-row--villain {
+  max-width: 1660px;
+  grid-template-columns: minmax(340px, 1.2fr) minmax(125px, 0.4fr) minmax(125px, 0.4fr) minmax(420px, 1.45fr);
 }
 .villain-focus-top-card {
   width: 100%;
@@ -174,6 +247,50 @@ input[type='checkbox']{
 .villain-focus-kpi-card .card-body {
   padding-top: 12px;
   padding-bottom: 12px;
+}
+.villain-focus-filter-layout {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  gap: 16px;
+  align-items: center;
+}
+.villain-focus-hero {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 116px;
+}
+.villain-focus-hero-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.villain-focus-hero-avatar-shell {
+  width: 92px;
+  height: 92px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 2px solid rgba(216,197,138,0.48);
+  box-shadow: 0 10px 24px rgba(0,0,0,0.34);
+  background: rgba(255,255,255,0.04);
+}
+.villain-focus-hero-avatar {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  object-position: center;
+  transform: scale(1.40);
+  transform-origin: center;
+}
+.villain-focus-hero-name {
+  font-size: 12px;
+  line-height: 1.15;
+  text-align: center;
+  color: var(--app-gold-2);
+  font-weight: 700;
 }
 .villain-focus-filter-row {
   display: grid;
@@ -188,22 +305,25 @@ input[type='checkbox']{
   margin-bottom: 0;
 }
 .villain-focus-kpi-card { min-height: 0 !important; }
+.villain-focus-kpi-card .card-header {
+  padding-bottom: 10px;
+}
 .villain-focus-kpi-body {
   display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 8px 10px;
+  grid-template-columns: 1fr;
+  gap: 8px;
   align-items: center;
-  min-height: 70px;
+  min-height: 116px;
 }
 .villain-focus-kpi-main,
 .villain-focus-kpi-side {
   min-width: 0;
 }
 .villain-focus-kpi-side {
-  text-align: right;
+  text-align: left;
 }
 .villain-focus-kpi-card .kpi {
-  font-size: 24px;
+  font-size: 22px;
   margin: 0;
 }
 .villain-focus-kpi-card .kpi-label {
@@ -212,7 +332,22 @@ input[type='checkbox']{
 .villain-focus-kpi-card .kpi-rank {
   margin-top: 0;
   white-space: nowrap;
-  font-size: 11.5px;
+  font-size: 11px;
+}
+.villain-focus-top-row--villain .villain-focus-kpi-body {
+  min-height: 108px;
+  gap: 6px;
+}
+.villain-focus-top-row--villain .villain-focus-kpi-card .card-body {
+  padding-left: 10px;
+  padding-right: 10px;
+}
+.villain-focus-top-row--villain .villain-focus-kpi-card .kpi {
+  font-size: 28px;
+}
+.villain-focus-top-row--villain .villain-focus-kpi-card .kpi-label,
+.villain-focus-top-row--villain .villain-focus-kpi-card .kpi-rank {
+  font-size: 10px;
 }
 .villain-focus-table-wrap {
   max-width: 980px;
@@ -220,12 +355,12 @@ input[type='checkbox']{
 }
 .villain-focus-table-wrap table.dataTable { width: 100% !important; }
 .villain-focus-players-card {
-  max-width: 860px;
-  margin: 0 auto;
+  max-width: none;
+  margin: 0;
 }
 .villain-focus-players-wrap {
-  max-width: 620px;
-  margin: 0 auto;
+  max-width: none;
+  margin: 0;
 }
 .villain-focus-players-wrap table.dataTable { width: 100% !important; }
 .villain-focus-players-wrap .dataTables_wrapper {
@@ -407,6 +542,33 @@ input[type='checkbox']{
   font-weight: 900;
   line-height: 1.1;
 }
+.villain-matchup-name .villain-inline {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+}
+.villain-matchup-name .villain-avatar-shell {
+  justify-self: center;
+  width: 34px;
+  height: 34px;
+}
+.villain-matchup-name .villain-inline-label {
+  min-width: 0;
+  display: block;
+}
+.villain-matchup-card.is-rank-1 .villain-matchup-name .villain-avatar-shell {
+  width: 42px;
+  height: 42px;
+}
+.villain-matchup-card.is-rank-2 .villain-matchup-name .villain-avatar-shell {
+  width: 38px;
+  height: 38px;
+}
+.villain-matchup-card.is-rank-3 .villain-matchup-name .villain-avatar-shell {
+  width: 34px;
+  height: 34px;
+}
 .villain-matchup-card.is-rank-2 .villain-matchup-name { font-size: 16px; }
 .villain-matchup-card.is-rank-3 .villain-matchup-name { font-size: 15px; }
 .villain-matchup-winrate {
@@ -448,6 +610,39 @@ input[type='checkbox']{
   background: rgba(47,125,75,0.14);
   border: 1px solid rgba(216,197,138,0.30);
   margin-right: 6px; margin-bottom: 6px;
+  vertical-align: middle;
+}
+.badge-soft-villain {
+  gap: 7px;
+  padding: 5px 8px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.badge-soft-villain .villain-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.badge-soft-villain .villain-inline-label {
+  font-size: 14px;
+  font-weight: 700;
+}
+.badge-soft-rank,
+.badge-soft-score {
+  display: inline-flex;
+  align-items: center;
+  line-height: 1;
+  white-space: nowrap;
+}
+.badge-soft-score {
+  color: var(--app-gold-2);
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.2px;
+}
+.badge-soft-villain .villain-avatar-shell {
+  width: 20px !important;
+  height: 20px !important;
 }
 .trophy-1 { color: #d4af37; text-shadow: 0 0 10px rgba(212,175,55,.35); }
 .trophy-2 { color: #c0c0c0; text-shadow: 0 0 10px rgba(192,192,192,.25); }

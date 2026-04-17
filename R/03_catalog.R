@@ -74,6 +74,58 @@ label_villain <- function(villain_id, lang) {
   if (lang == "fr") row$villain_fr[1] else row$villain_en[1]
 }
 
+villain_image_src <- function(villain_id) {
+  exts <- c(".png", ".jpg", ".jpeg", ".webp", ".PNG", ".JPG", ".JPEG", ".Jpg")
+  for (ext in exts) {
+    rel <- file.path("villains", paste0(villain_id, ext))
+    if (file.exists(file.path("www", rel))) return(rel)
+  }
+  NULL
+}
+
+villain_label_tag <- function(villain_id, lang = "en", size = 28, compact = FALSE) {
+  label <- label_villain(villain_id, lang)
+  src <- villain_image_src(villain_id)
+  wrapper_class <- if (compact) "villain-inline villain-inline-compact" else "villain-inline"
+  if (is.null(src)) {
+    return(tags$span(class = wrapper_class, tags$span(class = "villain-inline-label", label)))
+  }
+  tags$span(
+    class = wrapper_class,
+    tags$span(
+      class = "villain-avatar-shell",
+      style = sprintf("width:%dpx;height:%dpx;", size, size),
+      tags$img(
+        src = src,
+        alt = label,
+        class = "villain-avatar"
+      )
+    ),
+    tags$span(class = "villain-inline-label", label)
+  )
+}
+
+villain_label_html <- function(villain_id, lang = "en", size = 28, compact = FALSE) {
+  as.character(villain_label_tag(villain_id, lang = lang, size = size, compact = compact))
+}
+
+villain_choices_html <- function(ids, lang = "en", size = 24, compact = TRUE) {
+  setNames(ids, vapply(ids, villain_label_html, character(1), lang = lang, size = size, compact = compact))
+}
+
+villain_selectize_render <- I(
+  "{
+    option: function(item, escape) {
+      var html = item.text || item.label || '';
+      return '<div class=\"villain-selectize-entry\">' + html + '</div>';
+    },
+    item: function(item, escape) {
+      var html = item.text || item.label || '';
+      return '<div class=\"villain-selectize-entry\">' + html + '</div>';
+    }
+  }"
+)
+
 # map old stored strings (FR or EN) -> villain_id
 name_to_id <- local({
   m <- list()

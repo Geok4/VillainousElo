@@ -4,7 +4,7 @@ compute_elo <- function(
     games,
     base_rating = 1500,
     k = 32,
-    alpha = 0.7,
+    alpha = 0.5,
     scale = 400,
     normalize_k_by_n = TRUE,  # ✅ équité 2–6 joueurs
     return_log = TRUE
