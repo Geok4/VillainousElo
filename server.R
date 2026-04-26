@@ -1,6 +1,6 @@
 # server.R
 server <- function(input, output, session) {
-  
+
   currentLang <- reactiveVal("en")
   tr <- function(key) tr_lang(currentLang(), key)
   clamp_player_count <- function(x) {
@@ -8,19 +8,19 @@ server <- function(input, output, session) {
     if (is.na(x)) return(2L)
     max(2L, min(6L, x))
   }
-  
+
   # keep current tab when switching language
   selectedTab <- reactiveVal("input")
   observeEvent(input$main_nav, {
     if (!is.null(input$main_nav) && nzchar(input$main_nav)) selectedTab(input$main_nav)
   })
-  
+
   output$app_ui <- renderUI({
     lang <- currentLang()
     lang_button_label <- if (lang == "en") "FR" else "EN"
     build_ui(lang, lang_button_label, selected_tab = isolate(selectedTab()))
   })
-  
+
   observeEvent(input$toggleLang, {
     currentLang(if (currentLang() == "en") "fr" else "en")
     showNotification(
@@ -28,21 +28,21 @@ server <- function(input, output, session) {
       type = "message", duration = 2
     )
   })
-  
+
   app_dir <- getwd()
   rds_path <- file.path(app_dir, "games.rds")
-  
+
   games <- reactiveVal({
     loaded <- load_rds_safe(rds_path)
     if (is.null(loaded)) list() else normalize_games(loaded)
   })
-  
+
   errorMsg <- reactiveVal("")
   dataMsg <- reactiveVal("")
   predMsg <- reactiveVal("")
-  
+
   elo_cfg <- reactiveValues(baseRating = 0, k = 32, alpha = 0.5, scale = 400)
-  
+
   observeEvent(input$openElo, {
     showModal(modalDialog(
       title = tr("elo_modal_title"),
@@ -61,7 +61,7 @@ server <- function(input, output, session) {
       )
     ))
   })
-  
+
   observeEvent(input$saveElo, {
     elo_cfg$baseRating <- as.integer(input$m_baseRating %||% 0)
     elo_cfg$k <- as.numeric(input$m_k %||% 32)
@@ -70,30 +70,30 @@ server <- function(input, output, session) {
     removeModal()
     showNotification(tr("notif_elo_applied"), type = "message", duration = 2.5)
   })
-  
+
   available_villain_ids <- reactive({
     sets <- input$setsOwned %||% sets_tbl$set_id
     v <- villains_tbl[villains_tbl$set_id %in% sets, "villain_id", drop = TRUE]
     sort(unique(v))
   })
-  
+
   villain_choices_named <- reactive({
     lang <- currentLang()
     ids <- available_villain_ids()
     villain_choices_html(ids, lang = lang, size = 22)
   })
-  
+
   set_choices_named <- reactive({
     lang <- currentLang()
     setNames(sets_tbl$set_id, if (lang == "fr") sets_tbl$set_fr else sets_tbl$set_en)
   })
-  
+
   known_players <- reactive({
     g <- games()
     if (length(g) == 0) return(character())
     sort(unique(unlist(lapply(g, function(x) x$seats$player))))
   })
-  
+
   observe({
     updateCheckboxGroupInput(
       session, "setsOwned",
@@ -102,7 +102,7 @@ server <- function(input, output, session) {
       selected = input$setsOwned %||% sets_tbl$set_id
     )
   })
-  
+
   elo_res <- reactive({
     compute_elo(
       games = games(),
@@ -113,30 +113,30 @@ server <- function(input, output, session) {
       return_log = TRUE
     )
   })
-  
+
   # -------- Seats UI (Input tab) --------
   output$seats_ui <- renderUI({
     n <- input$numPlayers
     req(n)
-    
+
     v_choices <- villain_choices_named()
     p_choices <- known_players()
-    
+
     tagList(lapply(seq_len(n), function(i) {
       p_id <- paste0("player_", i)
       v_id <- paste0("villain_", i)
-      
+
       current_p <- isolate(input[[p_id]])
       if (is.null(current_p) || current_p == "") current_p <- if (i == 1) "Geoff" else ""
-      
+
       current_v <- isolate(input[[v_id]])
       if (is.null(current_v)) current_v <- ""
-      
+
       v_choices2 <- v_choices
       if (!is.null(current_v) && current_v != "" && !(current_v %in% v_choices2)) {
         v_choices2 <- c(v_choices2, setNames(current_v, villain_label_html(current_v, currentLang(), size = 22, compact = TRUE)))
       }
-      
+
       div(
         style = "margin-bottom: 12px;",
         layout_columns(
@@ -165,7 +165,7 @@ server <- function(input, output, session) {
       )
     }))
   })
-  
+
   observe({
     n <- input$numPlayers
     req(n)
@@ -178,31 +178,31 @@ server <- function(input, output, session) {
       selected = if (length(players) > 0) players[1] else NULL
     )
   })
-  
+
   observeEvent(input$addGame, {
     errorMsg("")
     dataMsg("")
-    
+
     n <- input$numPlayers
     req(n)
-    
+
     players <- sapply(seq_len(n), function(i) trimws(input[[paste0("player_", i)]] %||% ""))
     villains <- sapply(seq_len(n), function(i) trimws(input[[paste0("villain_", i)]] %||% ""))
-    
+
     keep <- players != "" & villains != ""
     players <- players[keep]
     villains <- villains[keep]
-    
+
     if (length(players) < 2 || length(players) > 6) { errorMsg(tr("err_need_seats")); return() }
     if (length(unique(players)) != length(players)) { errorMsg(tr("err_unique_players")); return() }
     if (any(!villains %in% available_villain_ids())) { errorMsg(tr("err_villain_not_allowed")); return() }
-    
+
     winner <- trimws(input$winnerPlayer %||% "")
     if (winner == "" || !winner %in% players) { errorMsg(tr("err_winner_invalid")); return() }
-    
+
     dur <- suppressWarnings(as.integer(input$durationMin %||% NA_integer_))
     if (!is.na(dur) && dur < 5) { errorMsg(tr("err_duration_invalid")); return() }
-    
+
     g <- list(
       id = paste0(as.integer(Sys.time()), "_", sample(10000:99999, 1)),
       playedAt = as.character(as.Date(input$playedAt)),
@@ -210,16 +210,16 @@ server <- function(input, output, session) {
       winnerPlayer = winner,
       seats = data.frame(player = players, villainId = villains, stringsAsFactors = FALSE)
     )
-    
+
     new_games <- c(games(), list(g))
     games(new_games)
     save_rds_safe(new_games, rds_path)
     showNotification(tr("notif_game_saved"), type = "message", duration = 2.5)
   })
-  
+
   # -------- KPIs --------
   output$kpi_games <- renderText(length(games()))
-  
+
   output$kpi_avg_dur <- renderText({
     g <- games()
     d <- suppressWarnings(as.integer(sapply(g, function(x) x$durationMin %||% NA_integer_)))
@@ -227,7 +227,7 @@ server <- function(input, output, session) {
     if (length(d) == 0) return("—")
     fmt_h_min(mean(d))
   })
-  
+
   output$kpi_hours <- renderText({
     g <- games()
     d <- suppressWarnings(as.integer(sapply(g, function(x) x$durationMin %||% NA_integer_)))
@@ -235,7 +235,7 @@ server <- function(input, output, session) {
     if (length(d) == 0) return("—")
     paste0(round(sum(d) / 60, 1), " h")
   })
-  
+
   # -------- Top 3 badges --------
   output$topPlayersBadges <- renderUI({
     df <- make_leaderboard(elo_res()$playerRatings, elo_res()$playerGames)
@@ -248,7 +248,7 @@ server <- function(input, output, session) {
                 paste0("#", i, " ", top$key[i], " — ", top$Elo[i]))
     }))
   })
-  
+
   output$topVillainsBadges <- renderUI({
     lang <- currentLang()
     df <- make_leaderboard(elo_res()$villainRatings, elo_res()$villainGames)
@@ -265,11 +265,63 @@ server <- function(input, output, session) {
       )
     }))
   })
-  
+
   format_pct_label <- function(x, digits = 1) {
     ifelse(is.na(x), "\u2014", paste0(round(100 * x, digits), " %"))
   }
-  
+
+  format_winrate_label <- function(x) {
+    format_pct_label(x, digits = 0)
+  }
+
+  format_signed_pct_label <- function(x, digits = 1) {
+    ifelse(
+      is.na(x),
+      "\u2014",
+      paste0(ifelse(x > 0, "+", ""), round(100 * x, digits), " %")
+    )
+  }
+
+  pct_col_def <- function(align = "right", digits = 1, html = FALSE, ...) {
+    colDef(
+      align = align,
+      html = html,
+      cell = function(value) {
+        if (is.null(value) || length(value) == 0 || is.na(value)) return("\u2014")
+        paste0(round(100 * as.numeric(value), digits), " %")
+      },
+      ...
+    )
+  }
+
+  winrate_pct_col_def <- function(align = "right", html = FALSE, ...) {
+    pct_col_def(align = align, digits = 0, html = html, ...)
+  }
+
+  signed_pct_col_def <- function(align = "right", digits = 1, html = FALSE, ...) {
+    colDef(
+      align = align,
+      html = html,
+      cell = function(value) {
+        if (is.null(value) || length(value) == 0 || is.na(value)) return("\u2014")
+        paste0(ifelse(as.numeric(value) > 0, "+", ""), round(100 * as.numeric(value), digits), " %")
+      },
+      ...
+    )
+  }
+
+  signed_num_col_def <- function(align = "right", digits = 1, html = FALSE, ...) {
+    colDef(
+      align = align,
+      html = html,
+      cell = function(value) {
+        if (is.null(value) || length(value) == 0 || is.na(value)) return("\u2014")
+        paste0(ifelse(as.numeric(value) > 0, "+", ""), round(as.numeric(value), digits))
+      },
+      ...
+    )
+  }
+
   app_reactable_theme <- function(font_size = "12px", compact = TRUE) {
     reactableTheme(
       backgroundColor = "transparent",
@@ -307,7 +359,7 @@ server <- function(input, output, session) {
       )
     )
   }
-  
+
   build_reactable <- function(df, page_size = 10, searchable = TRUE, columns = NULL, default_sorted = NULL, class = "app-reactable") {
     rownames(df) <- NULL
     reactable(
@@ -331,17 +383,136 @@ server <- function(input, output, session) {
       class = class
     )
   }
-  
+
+  normalize_display_seats <- function(seats) {
+    if (is.null(seats) || !is.data.frame(seats)) {
+      return(data.frame(player = character(), villainId = character(), stringsAsFactors = FALSE))
+    }
+    if (!("villainId" %in% names(seats))) {
+      if ("villain" %in% names(seats)) seats$villainId <- villain_to_id(seats$villain)
+      else seats$villainId <- ""
+    }
+    seats$player <- trimws(as.character(seats$player))
+    seats$villainId <- villain_to_id(seats$villainId)
+    seats <- seats[seats$player != "" & seats$villainId != "", c("player", "villainId"), drop = FALSE]
+    rownames(seats) <- NULL
+    seats
+  }
+
+  focus_seats_html <- function(seats, lang, highlight_player = NULL, highlight_villain = NULL) {
+    seats <- normalize_display_seats(seats)
+    if (nrow(seats) == 0) return("\u2014")
+
+    match_focus <- vapply(seq_len(nrow(seats)), function(i) {
+      seat_match <- FALSE
+      if (!is.null(highlight_player) && nzchar(highlight_player)) {
+        seat_match <- seats$player[i] == highlight_player
+      }
+      if (!is.null(highlight_villain) && nzchar(highlight_villain)) {
+        seat_match <- if (seat_match) {
+          seats$villainId[i] == highlight_villain
+        } else if (is.null(highlight_player) || !nzchar(highlight_player)) {
+          seats$villainId[i] == highlight_villain
+        } else {
+          FALSE
+        }
+      }
+      seat_match
+    }, logical(1))
+
+    order_idx <- order(!match_focus, seq_len(nrow(seats)))
+
+    vapply(order_idx, function(i) {
+      player_name <- htmltools::htmlEscape(seats$player[i])
+      villain_html <- villain_label_html(seats$villainId[i], lang = lang, size = 18, compact = TRUE)
+      seat_html <- paste0(player_name, " (", villain_html, ")")
+      seat_is_focus <- match_focus[i]
+
+      if (seat_is_focus) {
+        paste0("<strong>", seat_html, "</strong>")
+      } else {
+        seat_html
+      }
+    }, character(1)) |>
+      paste(collapse = ", ")
+  }
+
+  build_focus_history_df <- function(log_df, games_list, mode = c("villain", "player"), target_id, lang) {
+    mode <- match.arg(mode)
+    if (!nzchar(target_id) || !is.data.frame(log_df) || nrow(log_df) == 0 || length(games_list) == 0) {
+      return(data.frame())
+    }
+
+    games_ids <- vapply(games_list, function(game) as.character(game$id %||% ""), character(1))
+    keep_games <- nzchar(games_ids)
+    games_map <- games_list[keep_games]
+    if (length(games_map) == 0) return(data.frame())
+    names(games_map) <- games_ids[keep_games]
+
+    if (mode == "villain") {
+      rows <- log_df[trimws(as.character(log_df$villainId)) == target_id, , drop = FALSE]
+    } else {
+      rows <- log_df[trimws(as.character(log_df$player)) == target_id, , drop = FALSE]
+    }
+    if (nrow(rows) == 0) return(data.frame())
+
+    out_rows <- lapply(seq_len(nrow(rows)), function(i) {
+      row <- rows[i, , drop = FALSE]
+      game_id <- as.character(row$gameId[1] %||% "")
+      game <- games_map[[game_id]]
+      seats <- if (!is.null(game)) normalize_display_seats(game$seats) else data.frame(player = character(), villainId = character(), stringsAsFactors = FALSE)
+      winner_name <- if (!is.null(game)) trimws(as.character(game$winnerPlayer %||% "")) else trimws(as.character(row$player[1] %||% ""))
+
+      result_label <- if (isTRUE(row$isWinner[1])) tr("result_win") else tr("result_loss")
+      seats_html <- if (mode == "villain") {
+        focus_seats_html(seats, lang, highlight_player = trimws(as.character(row$player[1])), highlight_villain = trimws(as.character(row$villainId[1])))
+      } else {
+        focus_seats_html(seats, lang, highlight_player = trimws(as.character(row$player[1])))
+      }
+
+      base <- data.frame(
+        Date = as.character(row$playedAt[1] %||% ""),
+        Result = result_label,
+        Winner = winner_name,
+        Expected = suppressWarnings(as.numeric(row$p_win_villain[1] %||% NA_real_)),
+        EloDelta = suppressWarnings(as.numeric(if (mode == "villain") row$d_villain[1] else row$d_player[1])),
+        DurationMin = suppressWarnings(as.numeric(row$durationMin[1] %||% NA_real_)),
+        Seats = seats_html,
+        stringsAsFactors = FALSE
+      )
+
+      if (mode == "villain") {
+        data.frame(
+          Player = trimws(as.character(row$player[1] %||% "")),
+          base,
+          stringsAsFactors = FALSE
+        )
+      } else {
+        data.frame(
+          Villain = villain_label_html(trimws(as.character(row$villainId[1] %||% "")), lang = lang, size = 22, compact = TRUE),
+          base,
+          stringsAsFactors = FALSE
+        )
+      }
+    })
+
+    out <- do.call(rbind, out_rows)
+    out <- out[order(out$Date, decreasing = TRUE), , drop = FALSE]
+    rownames(out) <- NULL
+    out
+  }
+
   output$playersTable <- renderReactable({
     df <- make_leaderboard(elo_res()$playerRatings, elo_res()$playerGames)
     p <- profiles()$players
-    
+
     if (nrow(df) == 0) {
       shown <- data.frame(
         Name = character(),
         Elo = integer(),
         Games = integer(),
-        Winrate = character(),
+        Winrate = numeric(),
+        Adjusted = numeric(),
         AvgWin = character(),
         AvgLoss = character(),
         stringsAsFactors = FALSE
@@ -354,28 +525,30 @@ server <- function(input, output, session) {
         Games = df$Games,
         stringsAsFactors = FALSE
       )
-      
+
       if (nrow(p) > 0) {
         shown <- merge(
           shown,
-          p[, c("key", "Winrate", "AvgWin", "AvgLoss"), drop = FALSE],
+          p[, c("key", "Winrate", "AdjustedWinrate", "AvgWin", "AvgLoss"), drop = FALSE],
           by = "key",
           all.x = TRUE,
           sort = FALSE
         )
       } else {
         shown$Winrate <- NA_real_
+        shown$AdjustedWinrate <- NA_real_
         shown$AvgWin <- NA_real_
         shown$AvgLoss <- NA_real_
       }
-      
+
+      shown <- shown[, c("key", "Name", "Elo", "Games", "Winrate", "AdjustedWinrate", "AvgWin", "AvgLoss")]
       shown <- shown[order(-shown$Elo, -shown$Games, shown$Name), , drop = FALSE]
-      shown$Winrate <- format_pct_label(shown$Winrate)
       shown$AvgWin <- fmt_h_min(shown$AvgWin)
       shown$AvgLoss <- fmt_h_min(shown$AvgLoss)
+      names(shown)[names(shown) == "AdjustedWinrate"] <- "Adjusted"
       shown$key <- NULL
     }
-    
+
     build_reactable(
       shown,
       page_size = 12,
@@ -383,25 +556,27 @@ server <- function(input, output, session) {
         Name = colDef(align = "left"),
         Elo = colDef(align = "right"),
         Games = colDef(align = "right"),
-        Winrate = colDef(align = "right"),
+        Winrate = winrate_pct_col_def(align = "right"),
+        Adjusted = winrate_pct_col_def(align = "right", name = tr("adjusted")),
         AvgWin = colDef(align = "right"),
         AvgLoss = colDef(align = "right")
       ),
       default_sorted = list(Elo = "desc")
     )
   })
-  
+
   output$villainsTable <- renderReactable({
     lang <- currentLang()
     df <- make_leaderboard(elo_res()$villainRatings, elo_res()$villainGames)
     v <- profiles()$villains
-    
+
     if (nrow(df) == 0) {
       shown <- data.frame(
         Name = character(),
         Elo = integer(),
         Games = integer(),
-        Winrate = character(),
+        Winrate = numeric(),
+        Adjusted = numeric(),
         AvgWin = character(),
         AvgLoss = character(),
         stringsAsFactors = FALSE
@@ -414,28 +589,30 @@ server <- function(input, output, session) {
         Games = df$Games,
         stringsAsFactors = FALSE
       )
-      
+
       if (nrow(v) > 0) {
         shown <- merge(
           shown,
-          v[, c("key", "Winrate", "AvgWin", "AvgLoss"), drop = FALSE],
+          v[, c("key", "Winrate", "AdjustedWinrate", "AvgWin", "AvgLoss"), drop = FALSE],
           by = "key",
           all.x = TRUE,
           sort = FALSE
         )
       } else {
         shown$Winrate <- NA_real_
+        shown$AdjustedWinrate <- NA_real_
         shown$AvgWin <- NA_real_
         shown$AvgLoss <- NA_real_
       }
-      
+
+      shown <- shown[, c("key", "Name", "Elo", "Games", "Winrate", "AdjustedWinrate", "AvgWin", "AvgLoss")]
       shown <- shown[order(-shown$Elo, -shown$Games, shown$Name), , drop = FALSE]
-      shown$Winrate <- format_pct_label(shown$Winrate)
       shown$AvgWin <- fmt_h_min(shown$AvgWin)
       shown$AvgLoss <- fmt_h_min(shown$AvgLoss)
+      names(shown)[names(shown) == "AdjustedWinrate"] <- "Adjusted"
       shown$key <- NULL
     }
-    
+
     build_reactable(
       shown,
       page_size = 12,
@@ -443,38 +620,41 @@ server <- function(input, output, session) {
         Name = colDef(align = "left", html = TRUE),
         Elo = colDef(align = "right"),
         Games = colDef(align = "right"),
-        Winrate = colDef(align = "right"),
+        Winrate = winrate_pct_col_def(align = "right"),
+        Adjusted = winrate_pct_col_def(align = "right", name = tr("adjusted")),
         AvgWin = colDef(align = "right"),
         AvgLoss = colDef(align = "right")
       ),
       default_sorted = list(Elo = "desc")
     )
   })
-  
+
   # -------- Profiles --------
   profiles <- reactive({
-    build_profiles(games(), normalize_by_players = isTRUE(input$dur_norm %||% TRUE))
+    build_profiles(
+      elo_res()$log,
+      normalize_by_players = isTRUE(input$dur_norm %||% TRUE)
+    )
   })
-  
+
   output$profilesPlayersTable <- renderReactable({
     p <- profiles()$players
     if (nrow(p) == 0) {
       return(build_reactable(
-        data.frame(Name = character(), Elo = integer(), Games = integer(), Winrate = character(), AvgWin = character(), AvgLoss = character()),
+        data.frame(Name = character(), Elo = integer(), Games = integer(), Winrate = numeric(), Adjusted = numeric()),
         page_size = 12,
         columns = list(Name = colDef(align = "left"))
       ))
     }
     pr <- elo_res()$playerRatings
     elo <- pr[p$key]; elo[is.na(elo)] <- elo_cfg$baseRating
-    
+
     shown <- data.frame(
       Name = p$key,
       Elo = as.integer(round(elo)),
       Games = p$Games,
-      Winrate = format_pct_label(p$Winrate),
-      AvgWin = fmt_h_min(p$AvgWin),
-      AvgLoss = fmt_h_min(p$AvgLoss),
+      Winrate = p$Winrate,
+      Adjusted = p$AdjustedWinrate,
       stringsAsFactors = FALSE
     )
     shown <- shown[order(-shown$Elo, -shown$Games, shown$Name), , drop = FALSE]
@@ -485,32 +665,32 @@ server <- function(input, output, session) {
         Name = colDef(align = "left"),
         Elo = colDef(align = "right"),
         Games = colDef(align = "right"),
-        Winrate = colDef(align = "right")
+        Winrate = winrate_pct_col_def(align = "right"),
+        Adjusted = winrate_pct_col_def(align = "right", name = tr("adjusted"))
       ),
       default_sorted = "Elo"
     )
   })
-  
+
   output$profilesVillainsTable <- renderReactable({
     lang <- currentLang()
     v <- profiles()$villains
     if (nrow(v) == 0) {
       return(build_reactable(
-        data.frame(Villain = character(), Elo = integer(), Games = integer(), Winrate = character(), AvgWin = character(), AvgLoss = character()),
+        data.frame(Villain = character(), Elo = integer(), Games = integer(), Winrate = numeric(), Adjusted = numeric()),
         page_size = 12,
         columns = list(Villain = colDef(align = "left"))
       ))
     }
     vr <- elo_res()$villainRatings
     elo <- vr[v$key]; elo[is.na(elo)] <- elo_cfg$baseRating
-    
+
     shown <- data.frame(
       Villain = vapply(v$key, villain_label_html, character(1), lang = lang, size = 28, compact = TRUE),
       Elo = as.integer(round(elo)),
       Games = v$Games,
-      Winrate = format_pct_label(v$Winrate),
-      AvgWin = fmt_h_min(v$AvgWin),
-      AvgLoss = fmt_h_min(v$AvgLoss),
+      Winrate = v$Winrate,
+      Adjusted = v$AdjustedWinrate,
       stringsAsFactors = FALSE
     )
     shown <- shown[order(-shown$Elo, -shown$Games, shown$Villain), , drop = FALSE]
@@ -521,12 +701,13 @@ server <- function(input, output, session) {
         Villain = colDef(align = "left", html = TRUE),
         Elo = colDef(align = "right"),
         Games = colDef(align = "right"),
-        Winrate = colDef(align = "right")
+        Winrate = winrate_pct_col_def(align = "right"),
+        Adjusted = winrate_pct_col_def(align = "right", name = tr("adjusted"))
       ),
       default_sorted = "Elo"
     )
   })
-  
+
   # -------- Villain focus --------
   observe({
     updateNumericInput(
@@ -543,12 +724,12 @@ server <- function(input, output, session) {
     lang <- currentLang()
     ids <- available_villain_ids()
     if (length(ids) == 0) ids <- villains_tbl$villain_id
-    
+
     current_sel <- isolate(input$villainDetailId %||% "")
     if (!(current_sel %in% ids)) {
       current_sel <- if (length(ids) > 0) ids[1] else NULL
     }
-    
+
     updateSelectizeInput(
       session, "villainDetailId",
       label = tr("villain_pick"),
@@ -585,7 +766,7 @@ server <- function(input, output, session) {
     target_n <- clamp_player_count(input$villainDetailPlayerCount %||% 2L)
     g <- games()
     if (length(g) == 0) return(g)
-    
+
     Filter(function(game) {
       seats <- game$seats
       if (is.null(seats) || !is.data.frame(seats)) return(FALSE)
@@ -602,10 +783,17 @@ server <- function(input, output, session) {
       nrow(seats) == target_n
     }, g)
   })
-  
+
+  villain_focus_log <- reactive({
+    target_n <- clamp_player_count(input$villainDetailPlayerCount %||% 2L)
+    log_df <- elo_res()$log
+    if (!is.data.frame(log_df) || nrow(log_df) == 0) return(data.frame())
+    n_players <- suppressWarnings(as.integer(log_df$nPlayers))
+    log_df[!is.na(n_players) & n_players == target_n, , drop = FALSE]
+  })
+
   villain_detail <- reactive({
     vid <- input$villainDetailId %||% ""
-    target_n <- clamp_player_count(input$villainDetailPlayerCount %||% 2L)
     if (!nzchar(vid)) {
       return(list(
         summary = data.frame(
@@ -613,6 +801,9 @@ server <- function(input, output, session) {
           Games = integer(),
           Wins = integer(),
           Winrate = numeric(),
+          AdjustedWinrate = numeric(),
+          ExpectedWinrate = numeric(),
+          DeltaWinrate = numeric(),
           stringsAsFactors = FALSE
         ),
         by_player = data.frame(
@@ -621,35 +812,45 @@ server <- function(input, output, session) {
           Games = integer(),
           Wins = integer(),
           Winrate = numeric(),
+          AdjustedWinrate = numeric(),
+          ExpectedWinrate = numeric(),
+          DeltaWinrate = numeric(),
           stringsAsFactors = FALSE
         )
       ))
     }
-    
-    build_villain_detail(villain_focus_games(), vid, player_count = target_n)
+
+    build_villain_detail(
+      villain_focus_log(),
+      vid,
+      normalize_by_players = isTRUE(input$dur_norm %||% TRUE)
+    )
   })
 
   villain_focus_profiles <- reactive({
-    build_profiles(villain_focus_games(), normalize_by_players = isTRUE(input$dur_norm %||% TRUE))$villains
+    build_profiles(
+      villain_focus_log(),
+      normalize_by_players = isTRUE(input$dur_norm %||% TRUE)
+    )$villains
   })
 
   villain_detail_ranks <- reactive({
     vid <- input$villainDetailId %||% ""
     prof <- villain_focus_profiles()
-    
+
     empty <- list(winrate = "\u2014", games = "\u2014")
     if (!nzchar(vid) || nrow(prof) == 0 || !vid %in% prof$key) return(empty)
-    
+
     total <- nrow(prof)
-    
-    wr_tbl <- prof[order(-prof$Winrate, -prof$Games, prof$key), c("key", "Winrate", "Games"), drop = FALSE]
+
+    wr_tbl <- prof[order(-prof$AdjustedWinrate, -prof$Winrate, -prof$Games, prof$key), c("key", "AdjustedWinrate", "Winrate", "Games"), drop = FALSE]
     wr_tbl$Rank <- seq_len(nrow(wr_tbl))
     wr_rank <- wr_tbl$Rank[match(vid, wr_tbl$key)]
-    
+
     games_tbl <- prof[order(-prof$Games, -prof$Winrate, prof$key), c("key", "Games", "Winrate"), drop = FALSE]
     games_tbl$Rank <- seq_len(nrow(games_tbl))
     games_rank <- games_tbl$Rank[match(vid, games_tbl$key)]
-    
+
     list(
       winrate = paste0("#", wr_rank, " / ", total),
       games = paste0("#", games_rank, " / ", total)
@@ -660,16 +861,16 @@ server <- function(input, output, session) {
     vid <- input$villainDetailId %||% ""
     g <- villain_focus_games()
     if (!nzchar(vid) || length(g) == 0) return(data.frame())
-    
+
     wins_env <- new.env(parent = emptyenv())
     h2h_env <- new.env(parent = emptyenv())
     together_env <- new.env(parent = emptyenv())
-    
+
     add_key <- function(env, k, v = 1L) {
       if (!exists(k, envir = env, inherits = FALSE)) assign(k, v, envir = env)
       else assign(k, get(k, envir = env, inherits = FALSE) + v, envir = env)
     }
-    
+
     for (game in g) {
       seats <- game$seats
       if (is.null(seats) || !is.data.frame(seats)) next
@@ -680,20 +881,20 @@ server <- function(input, output, session) {
           seats$villainId <- ""
         }
       }
-      
+
       seats$player <- trimws(as.character(seats$player))
       seats$villainId <- trimws(as.character(seats$villainId))
       seats <- seats[seats$player != "" & seats$villainId != "", c("player", "villainId"), drop = FALSE]
       if (!vid %in% seats$villainId) next
-      
+
       opponents <- sort(unique(seats$villainId[seats$villainId != vid]))
       if (length(opponents) == 0) next
-      
+
       winner_player <- trimws(game$winnerPlayer %||% "")
       if (winner_player == "" || !winner_player %in% seats$player) next
       winner_vill <- trimws(seats$villainId[match(winner_player, seats$player)])
       if (winner_vill == "") next
-      
+
       for (opp in opponents) {
         add_key(together_env, opp, 1L)
         if (winner_vill %in% c(vid, opp)) {
@@ -702,10 +903,10 @@ server <- function(input, output, session) {
         }
       }
     }
-    
+
     opps <- sort(unique(c(ls(together_env), ls(h2h_env), ls(wins_env))))
     if (length(opps) == 0) return(data.frame())
-    
+
     out <- data.frame(
       OpponentId = opps,
       GamesTogether = vapply(opps, function(k) get0(k, envir = together_env, ifnotfound = 0L), integer(1)),
@@ -715,7 +916,7 @@ server <- function(input, output, session) {
     )
     out <- out[out$GamesTogether > 0, , drop = FALSE]
     if (nrow(out) == 0) return(out)
-    
+
     out$Winrate <- ifelse(out$H2HGames > 0, out$Wins / out$H2HGames, NA_real_)
     out <- out[order(-out$Winrate, -out$H2HGames, -out$GamesTogether, out$OpponentId), , drop = FALSE]
     rownames(out) <- NULL
@@ -771,9 +972,16 @@ server <- function(input, output, session) {
     }, g)
   })
 
+  player_focus_log <- reactive({
+    target_n <- clamp_player_count(input$playerDetailPlayerCount %||% 2L)
+    log_df <- elo_res()$log
+    if (!is.data.frame(log_df) || nrow(log_df) == 0) return(data.frame())
+    n_players <- suppressWarnings(as.integer(log_df$nPlayers))
+    log_df[!is.na(n_players) & n_players == target_n, , drop = FALSE]
+  })
+
   player_detail <- reactive({
     pid <- input$playerDetailId %||% ""
-    target_n <- clamp_player_count(input$playerDetailPlayerCount %||% 2L)
     if (!nzchar(pid)) {
       return(list(
         summary = data.frame(
@@ -781,6 +989,9 @@ server <- function(input, output, session) {
           Games = integer(),
           Wins = integer(),
           Winrate = numeric(),
+          AdjustedWinrate = numeric(),
+          ExpectedWinrate = numeric(),
+          DeltaWinrate = numeric(),
           stringsAsFactors = FALSE
         ),
         by_villain = data.frame(
@@ -789,16 +1000,26 @@ server <- function(input, output, session) {
           Games = integer(),
           Wins = integer(),
           Winrate = numeric(),
+          AdjustedWinrate = numeric(),
+          ExpectedWinrate = numeric(),
+          DeltaWinrate = numeric(),
           stringsAsFactors = FALSE
         )
       ))
     }
 
-    build_player_detail(player_focus_games(), pid, player_count = target_n)
+    build_player_detail(
+      player_focus_log(),
+      pid,
+      normalize_by_players = isTRUE(input$dur_norm %||% TRUE)
+    )
   })
 
   player_focus_profiles <- reactive({
-    build_profiles(player_focus_games(), normalize_by_players = isTRUE(input$dur_norm %||% TRUE))$players
+    build_profiles(
+      player_focus_log(),
+      normalize_by_players = isTRUE(input$dur_norm %||% TRUE)
+    )$players
   })
 
   player_detail_ranks <- reactive({
@@ -810,7 +1031,7 @@ server <- function(input, output, session) {
 
     total <- nrow(prof)
 
-    wr_tbl <- prof[order(-prof$Winrate, -prof$Games, prof$key), c("key", "Winrate", "Games"), drop = FALSE]
+    wr_tbl <- prof[order(-prof$AdjustedWinrate, -prof$Winrate, -prof$Games, prof$key), c("key", "AdjustedWinrate", "Winrate", "Games"), drop = FALSE]
     wr_tbl$Rank <- seq_len(nrow(wr_tbl))
     wr_rank <- wr_tbl$Rank[match(pid, wr_tbl$key)]
 
@@ -892,13 +1113,139 @@ server <- function(input, output, session) {
     rownames(out) <- NULL
     out
   })
-  
+
+  villain_focus_history <- reactive({
+    vid <- input$villainDetailId %||% ""
+    build_focus_history_df(
+      villain_focus_log(),
+      villain_focus_games(),
+      mode = "villain",
+      target_id = vid,
+      lang = currentLang()
+    )
+  })
+
+  player_focus_history <- reactive({
+    pid <- input$playerDetailId %||% ""
+    build_focus_history_df(
+      player_focus_log(),
+      player_focus_games(),
+      mode = "player",
+      target_id = pid,
+      lang = currentLang()
+    )
+  })
+
+  build_focus_history_reactable <- function(df, mode = c("villain", "player"), lang = currentLang()) {
+    mode <- match.arg(mode)
+    first_key <- if (mode == "villain") "player_pick" else "villain_pick"
+    first_col_en <- if (mode == "villain") "Player" else "Villain"
+    first_col_fr <- tr_lang("fr", first_key)
+    first_col_def <- if (mode == "villain") {
+      colDef(align = "left", minWidth = 120)
+    } else {
+      colDef(align = "left", html = TRUE, minWidth = 144)
+    }
+
+    empty_df <- if (mode == "villain") {
+      data.frame(
+        Player = character(),
+        Date = character(),
+        Result = character(),
+        Winner = character(),
+        Expected = numeric(),
+        EloDelta = numeric(),
+        DurationMin = numeric(),
+        Seats = character(),
+        stringsAsFactors = FALSE
+      )
+    } else {
+      data.frame(
+        Villain = character(),
+        Date = character(),
+        Result = character(),
+        Winner = character(),
+        Expected = numeric(),
+        EloDelta = numeric(),
+        DurationMin = numeric(),
+        Seats = character(),
+        stringsAsFactors = FALSE
+      )
+    }
+
+    shown <- if (nrow(df) == 0) empty_df else df
+    if (lang == "fr") {
+      names(shown) <- c(
+        first_col_fr,
+        "Date",
+        tr("game_result"),
+        tr("winner"),
+        tr("expected"),
+        tr("elo_delta"),
+        tr("duration_min"),
+        tr("seats")
+      )
+      first_col <- first_col_fr
+      result_col <- tr("game_result")
+      winner_col <- tr("winner")
+      expected_col <- tr("expected")
+      delta_col <- tr("elo_delta")
+      duration_col <- tr("duration_min")
+      seats_col <- tr("seats")
+      date_col <- "Date"
+    } else {
+      names(shown) <- c(
+        first_col_en,
+        "Date",
+        "Result",
+        "Winner",
+        "Expected",
+        "Elo delta",
+        "Duration",
+        "Seats"
+      )
+      first_col <- first_col_en
+      result_col <- "Result"
+      winner_col <- "Winner"
+      expected_col <- "Expected"
+      delta_col <- "Elo delta"
+      duration_col <- "Duration"
+      seats_col <- "Seats"
+      date_col <- "Date"
+    }
+
+    build_reactable(
+      shown,
+      page_size = 12,
+      columns = stats::setNames(
+        list(
+          first_col_def,
+          colDef(align = "left", minWidth = 104),
+          colDef(align = "left", minWidth = 78),
+          colDef(align = "left", minWidth = 96),
+          pct_col_def(align = "right", minWidth = 92),
+          signed_num_col_def(align = "right", digits = 1, minWidth = 82),
+          colDef(align = "right", minWidth = 84),
+          colDef(align = "left", html = TRUE, minWidth = 360)
+        ),
+        c(first_col, date_col, result_col, winner_col, expected_col, delta_col, duration_col, seats_col)
+      ),
+      default_sorted = list(Date = "desc")
+    )
+  }
+
   output$villainDetailWinrate <- renderText({
     s <- villain_detail()$summary
     if (nrow(s) == 0 || is.na(s$Winrate[1])) return("—")
-    paste0(round(100 * s$Winrate[1], 1), " %")
+    format_winrate_label(s$Winrate[1])
   })
-  
+
+  output$villainDetailAdjustedWinrate <- renderText({
+    s <- villain_detail()$summary
+    if (nrow(s) == 0 || is.na(s$AdjustedWinrate[1])) return("\u2014")
+    format_winrate_label(s$AdjustedWinrate[1])
+  })
+
   output$villainDetailGames <- renderText({
     s <- villain_detail()$summary
     if (nrow(s) == 0) return("0")
@@ -912,11 +1259,11 @@ server <- function(input, output, session) {
   output$villainDetailGamesRank <- renderText({
     villain_detail_ranks()$games
   })
-  
+
   output$villainDetailPlayersTable <- renderReactable({
     df <- villain_detail()$by_player
     lang <- currentLang()
-    
+
     if (nrow(df) == 0) {
       empty_df <- if (lang == "fr") {
         data.frame(
@@ -925,6 +1272,7 @@ server <- function(input, output, session) {
           Parties = integer(),
           Victoires = integer(),
           Winrate = numeric(),
+          Corrige = numeric(),
           stringsAsFactors = FALSE
         )
       } else {
@@ -934,10 +1282,11 @@ server <- function(input, output, session) {
           Games = integer(),
           Wins = integer(),
           Winrate = numeric(),
+          Adjusted = numeric(),
           stringsAsFactors = FALSE
         )
       }
-      
+
       rownames(empty_df) <- NULL
       return(reactable(
         empty_df,
@@ -954,25 +1303,26 @@ server <- function(input, output, session) {
         class = "villain-reactable"
       ))
     }
-    
-    shown <- df
+
+    shown <- df[, c("Rank", "Player", "Games", "Wins", "Winrate", "AdjustedWinrate"), drop = FALSE]
     rownames(shown) <- NULL
-    
+    names(shown) <- c("Rank", "Player", "Games", "Wins", "Winrate", "Adjusted")
+
     if (lang == "fr") {
-      names(shown) <- c("Rang", "Joueur", "Parties", "Victoires", "Winrate")
-      shown$Winrate <- paste0(round(shown$Winrate * 100, 1), " %")
+      names(shown) <- c("Rang", "Joueur", "Parties", "Victoires", "Winrate", "Corrige")
       rank_col <- "Rang"
       player_col <- "Joueur"
       games_col <- "Parties"
       wins_col <- "Victoires"
+      adjusted_col <- "Corrige"
     } else {
-      shown$Winrate <- paste0(round(shown$Winrate * 100, 1), " %")
       rank_col <- "Rank"
       player_col <- "Player"
       games_col <- "Games"
       wins_col <- "Wins"
+      adjusted_col <- "Adjusted"
     }
-    
+
     reactable(
       shown,
       rownames = FALSE,
@@ -986,13 +1336,14 @@ server <- function(input, output, session) {
       fullWidth = TRUE,
       columns = stats::setNames(
         list(
-          colDef(align = "center"),
-          colDef(align = "left"),
-          colDef(align = "right"),
-          colDef(align = "right"),
-          colDef(align = "right")
+          colDef(align = "center", minWidth = 52, maxWidth = 58),
+          colDef(align = "left", minWidth = 118),
+          colDef(align = "right", minWidth = 58, maxWidth = 68),
+          colDef(align = "right", minWidth = 56, maxWidth = 66),
+          winrate_pct_col_def(align = "right", minWidth = 78, maxWidth = 88),
+          winrate_pct_col_def(align = "right", minWidth = 82, maxWidth = 92)
         ),
-        c(rank_col, player_col, games_col, wins_col, "Winrate")
+        c(rank_col, player_col, games_col, wins_col, "Winrate", adjusted_col)
       ),
       defaultColDef = colDef(
         align = "center",
@@ -1001,7 +1352,7 @@ server <- function(input, output, session) {
           textTransform = "none"
         )
       ),
-      theme = app_reactable_theme(),
+      theme = app_reactable_theme(font_size = "11px", compact = TRUE),
       class = "villain-reactable"
     )
   })
@@ -1009,7 +1360,13 @@ server <- function(input, output, session) {
   output$playerDetailWinrate <- renderText({
     s <- player_detail()$summary
     if (nrow(s) == 0 || is.na(s$Winrate[1])) return("—")
-    paste0(round(100 * s$Winrate[1], 1), " %")
+    format_winrate_label(s$Winrate[1])
+  })
+
+  output$playerDetailAdjustedWinrate <- renderText({
+    s <- player_detail()$summary
+    if (nrow(s) == 0 || is.na(s$AdjustedWinrate[1])) return("\u2014")
+    format_winrate_label(s$AdjustedWinrate[1])
   })
 
   output$playerDetailGames <- renderText({
@@ -1038,6 +1395,7 @@ server <- function(input, output, session) {
           Parties = integer(),
           Victoires = integer(),
           Winrate = numeric(),
+          Corrige = numeric(),
           stringsAsFactors = FALSE
         )
       } else {
@@ -1047,6 +1405,7 @@ server <- function(input, output, session) {
           Games = integer(),
           Wins = integer(),
           Winrate = numeric(),
+          Adjusted = numeric(),
           stringsAsFactors = FALSE
         )
       }
@@ -1073,22 +1432,25 @@ server <- function(input, output, session) {
       Villain = vapply(df$VillainId, villain_label_html, character(1), lang = lang, size = 28, compact = TRUE),
       Games = df$Games,
       Wins = df$Wins,
-      Winrate = paste0(round(df$Winrate * 100, 1), " %"),
+      Winrate = df$Winrate,
+      Adjusted = df$AdjustedWinrate,
       stringsAsFactors = FALSE
     )
     rownames(shown) <- NULL
 
     if (lang == "fr") {
-      names(shown) <- c("Rang", "Vilain", "Parties", "Victoires", "Winrate")
+      names(shown) <- c("Rang", "Vilain", "Parties", "Victoires", "Winrate", "Corrige")
       rank_col <- "Rang"
       villain_col <- "Vilain"
       games_col <- "Parties"
       wins_col <- "Victoires"
+      adjusted_col <- "Corrige"
     } else {
       rank_col <- "Rank"
       villain_col <- "Villain"
       games_col <- "Games"
       wins_col <- "Wins"
+      adjusted_col <- "Adjusted"
     }
 
     reactable(
@@ -1104,13 +1466,14 @@ server <- function(input, output, session) {
       fullWidth = TRUE,
       columns = stats::setNames(
         list(
-          colDef(align = "center"),
-          colDef(align = "left", html = TRUE),
-          colDef(align = "right"),
-          colDef(align = "right"),
-          colDef(align = "right")
+          colDef(align = "center", minWidth = 52, maxWidth = 58),
+          colDef(align = "left", html = TRUE, minWidth = 146),
+          colDef(align = "right", minWidth = 58, maxWidth = 68),
+          colDef(align = "right", minWidth = 56, maxWidth = 66),
+          winrate_pct_col_def(align = "right", minWidth = 78, maxWidth = 88),
+          winrate_pct_col_def(align = "right", minWidth = 82, maxWidth = 92)
         ),
-        c(rank_col, villain_col, games_col, wins_col, "Winrate")
+        c(rank_col, villain_col, games_col, wins_col, "Winrate", adjusted_col)
       ),
       defaultColDef = colDef(
         align = "center",
@@ -1119,7 +1482,7 @@ server <- function(input, output, session) {
           textTransform = "none"
         )
       ),
-      theme = app_reactable_theme(),
+      theme = app_reactable_theme(font_size = "11px", compact = TRUE),
       class = "villain-reactable"
     )
   })
@@ -1143,18 +1506,18 @@ server <- function(input, output, session) {
     mode <- match.arg(mode)
     lang <- currentLang()
     eligible <- df[!is.na(df$Winrate) & df$H2HGames > 0, , drop = FALSE]
-    
+
     if (nrow(eligible) == 0) {
       return(tags$div(class = "villain-matchup-empty", empty_text))
     }
-    
+
     ord <- if (mode == "best") {
       order(-eligible$Winrate, -eligible$H2HGames, eligible$OpponentId)
     } else {
       order(eligible$Winrate, -eligible$H2HGames, eligible$OpponentId)
     }
     shown <- head(eligible[ord, , drop = FALSE], 3)
-    
+
     labels <- if (mode == "best") {
       c("Top 1", "Top 2", "Top 3")
     } else {
@@ -1163,7 +1526,7 @@ server <- function(input, output, session) {
     if (lang == "fr") {
       labels <- if (mode == "best") c("Top 1", "Top 2", "Top 3") else c("Flop 1", "Flop 2", "Flop 3")
     }
-    
+
     tags$div(
       class = "villain-matchup-stack",
       lapply(seq_len(nrow(shown)), function(i) {
@@ -1192,7 +1555,7 @@ server <- function(input, output, session) {
                   class = "villain-matchup-stat-label",
                   if (lang == "fr") "Winrate" else "Winrate"
                 ),
-                tags$div(class = "villain-matchup-winrate", paste0(round(100 * row$Winrate, 1), " %"))
+                tags$div(class = "villain-matchup-winrate", format_winrate_label(row$Winrate))
               ),
               tags$div(
                 class = "villain-matchup-stat",
@@ -1247,7 +1610,7 @@ server <- function(input, output, session) {
   output$villainDetailMatchupsTable <- renderReactable({
     df <- villain_focus_matchups()
     lang <- currentLang()
-    
+
     if (nrow(df) == 0) {
       empty_df <- data.frame(
         Opponent = character(),
@@ -1257,7 +1620,7 @@ server <- function(input, output, session) {
         Winrate = numeric(),
         stringsAsFactors = FALSE
       )
-      
+
       if (lang == "fr") names(empty_df) <- c("Adversaire", "Parties H2H", "Parties ensemble", "Victoires", "Winrate")
       else names(empty_df) <- c("Opponent", "H2H games", "Games together", "Wins", "Winrate")
       return(build_reactable(
@@ -1269,13 +1632,13 @@ server <- function(input, output, session) {
         )
       ))
     }
-    
+
     shown <- data.frame(
       Opponent = vapply(df$OpponentId, villain_label_html, character(1), lang = lang, size = 28, compact = TRUE),
       H2HGames = df$H2HGames,
       GamesTogether = df$GamesTogether,
       Wins = df$Wins,
-      Winrate = format_pct_label(df$Winrate),
+      Winrate = df$Winrate,
       stringsAsFactors = FALSE
     )
     if (lang == "fr") names(shown) <- c("Adversaire", "Parties H2H", "Parties ensemble", "Victoires", "Winrate")
@@ -1291,8 +1654,16 @@ server <- function(input, output, session) {
         `H2H games` = colDef(align = "right"),
         `Games together` = colDef(align = "right"),
         Wins = colDef(align = "right"),
-        Winrate = colDef(align = "right")
+          Winrate = winrate_pct_col_def(align = "right")
+        )
       )
+  })
+
+  output$villainDetailGamesTable <- renderReactable({
+    build_focus_history_reactable(
+      villain_focus_history(),
+      mode = "villain",
+      lang = currentLang()
     )
   })
 
@@ -1363,7 +1734,7 @@ server <- function(input, output, session) {
       H2HGames = df$H2HGames,
       GamesTogether = df$GamesTogether,
       Wins = df$Wins,
-      Winrate = format_pct_label(df$Winrate),
+      Winrate = df$Winrate,
       stringsAsFactors = FALSE
     )
     if (lang == "fr") names(shown) <- c("Adversaire", "Parties H2H", "Parties ensemble", "Victoires", "Winrate")
@@ -1379,71 +1750,79 @@ server <- function(input, output, session) {
         `H2H games` = colDef(align = "right"),
         `Games together` = colDef(align = "right"),
         Wins = colDef(align = "right"),
-        Winrate = colDef(align = "right")
+          Winrate = winrate_pct_col_def(align = "right")
+        )
       )
+  })
+
+  output$playerDetailGamesTable <- renderReactable({
+    build_focus_history_reactable(
+      player_focus_history(),
+      mode = "player",
+      lang = currentLang()
     )
   })
-  
+
   # -------- Timeline plot helpers --------
   timeline_entity <- function(games, cfg, type = c("player", "villain"), name) {
     type <- match.arg(type)
     if (length(games) == 0 || is.null(name) || name == "") return(data.frame())
-    
+
     base_rating <- cfg$baseRating
     k <- cfg$k
     alpha <- cfg$alpha
     scale <- cfg$scale
-    
+
     playerR <- numeric(); names(playerR) <- character()
     villainR <- numeric(); names(villainR) <- character()
-    
+
     ensure_player <- function(p) if (!p %in% names(playerR)) playerR[p] <<- base_rating
     ensure_villain <- function(v) if (!v %in% names(villainR)) villainR[v] <<- base_rating
-    
+
     games_sorted <- games[order(sapply(games, `[[`, "playedAt"), sapply(games, `[[`, "id"))]
     out <- data.frame(date = character(), gameId = character(), rating = numeric(), stringsAsFactors = FALSE)
-    
+
     for (g in games_sorted) {
       seats <- g$seats
       if (is.null(seats) || !is.data.frame(seats)) next
-      
+
       seats$player <- trimws(as.character(seats$player))
       seats$villainId <- trimws(as.character(seats$villainId))
       seats <- seats[seats$player != "" & seats$villainId != "", , drop = FALSE]
-      
+
       n <- nrow(seats)
       if (n < 2 || n > 6) next
-      
+
       winner <- trimws(g$winnerPlayer %||% "")
       if (!winner %in% seats$player) next
-      
+
       for (i in seq_len(n)) {
         ensure_player(seats$player[i])
         ensure_villain(seats$villainId[i])
       }
-      
+
       combined <- numeric(n)
       for (i in seq_len(n)) {
         p <- seats$player[i]
         v <- seats$villainId[i]
         combined[i] <- playerR[p] + villainR[v]
       }
-      
+
       q <- 10^(combined / scale)
       probs <- q / sum(q)
       S <- ifelse(seats$player == winner, 1, 0)
-      
+
       # same normalization as compute_elo()
       K_eff <- k * (n / (2 * (n - 1)))
       d_combined <- K_eff * (S - probs)
-      
+
       for (i in seq_len(n)) {
         p <- seats$player[i]
         v <- seats$villainId[i]
         playerR[p] <- playerR[p] + alpha * d_combined[i]
         villainR[v] <- villainR[v] + (1 - alpha) * d_combined[i]
       }
-      
+
       if (type == "player") {
         if (!name %in% names(playerR)) next
         out <- rbind(out, data.frame(date = g$playedAt, gameId = g$id, rating = playerR[name], stringsAsFactors = FALSE))
@@ -1452,10 +1831,10 @@ server <- function(input, output, session) {
         out <- rbind(out, data.frame(date = g$playedAt, gameId = g$id, rating = villainR[name], stringsAsFactors = FALSE))
       }
     }
-    
+
     out
   }
-  
+
   observe({
     type <- input$timelineType %||% "player"
     lang <- currentLang()
@@ -1482,28 +1861,28 @@ server <- function(input, output, session) {
       )
     }
   })
-  
+
   output$eloTimelinePlot <- renderPlot({
     req(input$timelineType, input$timelineName)
     cfg <- list(baseRating = elo_cfg$baseRating, k = elo_cfg$k, alpha = elo_cfg$alpha, scale = elo_cfg$scale)
     tl <- timeline_entity(games(), cfg, type = input$timelineType, name = input$timelineName)
-    
+
     if (nrow(tl) == 0) {
       par(bg = "#07150d", fg = "#e9eef6")
       plot.new(); text(0.5, 0.5, tr("not_enough_data"), col = "#cfe0ff", cex = 1.1)
       return()
     }
-    
+
     x <- seq_len(nrow(tl)); y <- tl$rating
     titleName <- if (input$timelineType == "villain") label_villain(input$timelineName, currentLang()) else input$timelineName
-    
+
     par(bg = "#07150d", fg = "#e9eef6", col.axis = "#cfe0ff", col.lab = "#cfe0ff", col.main = "#e9eef6")
     plot(x, y, type = "n",
          xlab = if (currentLang() == "fr") "Parties (chronologique)" else "Games (chronological)",
          ylab = "Elo", main = titleName, xaxt = "n")
     axis(1, at = x, labels = x)
     grid(col = "#1f2a3a", lty = 3)
-    
+
     # ✅ Villainous palette
     glow <- adjustcolor("#2f7d4b", alpha.f = 0.25)
     lines(x, y, lwd = 7, col = glow)
@@ -1511,13 +1890,13 @@ server <- function(input, output, session) {
     points(x, y, pch = 16, cex = 1.1, col = "#f3e7c3")
     points(x, y, pch = 16, cex = 2.0, col = adjustcolor("#2f7d4b", alpha.f = 0.20))
   })
-  
+
   # -------- Duration win/loss --------
   observe({
     type <- input$durType %||% "player"
     lang <- currentLang()
     log_df <- elo_res()$log
-    
+
     if (type == "player") {
       choices <- sort(unique(log_df$player))
       output$durNameUI <- renderUI(
@@ -1541,7 +1920,7 @@ server <- function(input, output, session) {
       )
     }
   })
-  
+
   output$durationWinLossPlot <- renderPlot({
     req(input$durType, input$durName)
     log_df <- elo_res()$log
@@ -1559,18 +1938,18 @@ server <- function(input, output, session) {
     }
     if (input$durType == "player") df <- df[df$player == input$durName, , drop = FALSE]
     else df <- df[df$villainId == input$durName, , drop = FALSE]
-    
+
     if (nrow(df) == 0) {
       par(bg = "#07150d", fg = "#e9eef6")
       plot.new(); text(0.5, 0.5, if (currentLang() == "fr") "Aucune ligne correspondant." else "No matching rows.",
                        col = "#cfe0ff", cex = 1.1)
       return()
     }
-    
+
     win <- df$durationMin[df$isWinner]
     loss <- df$durationMin[!df$isWinner]
     titleName <- if (input$durType == "villain") label_villain(input$durName, currentLang()) else input$durName
-    
+
     par(bg = "#07150d", fg = "#e9eef6", col.axis = "#cfe0ff", col.lab = "#cfe0ff", col.main = "#e9eef6")
     boxplot(list(Win = win, Loss = loss),
             main = paste0(tr("duration_win_loss"), " — ", titleName),
@@ -1579,25 +1958,25 @@ server <- function(input, output, session) {
             col = adjustcolor("#2f7d4b", alpha.f = 0.22))
     grid(col = "#1f2a3a", lty = 3)
   })
-  
+
   # -------- Matchups --------
   observe({
     g <- games()
     present <- character()
     if (length(g) > 0) present <- sort(unique(unlist(lapply(g, function(x) x$seats$villainId))))
     lang <- currentLang()
-    
+
     choices <- c(
       setNames("all", tr("mu_all")),
       setNames(present, vapply(present, label_villain, character(1), lang = lang))
     )
     updateSelectInput(session, "mu_focus", choices = choices, selected = "all")
   })
-  
+
   matchup_df <- reactive({
     g <- games()
     if (length(g) == 0) return(data.frame())
-    
+
     # Filter by player count if requested
     nf <- input$mu_n %||% "all"
     if (nf != "all") {
@@ -1605,48 +1984,48 @@ server <- function(input, output, session) {
       g <- Filter(function(x) nrow(x$seats) == nf_i, g)
     }
     if (length(g) == 0) return(data.frame())
-    
+
     wins_env   <- new.env(parent = emptyenv())  # wins for ordered A|||B
     h2h_env    <- new.env(parent = emptyenv())  # head-to-head games where winner ∈ {A,B}
     together_env <- new.env(parent = emptyenv())# games where both A and B are present
-    
+
     add_key <- function(env, k, v) {
       if (!exists(k, envir = env, inherits = FALSE)) assign(k, v, envir = env)
       else assign(k, get(k, env) + v, envir = env)
     }
-    
+
     for (game in g) {
       seats <- game$seats
       if (is.null(seats) || !is.data.frame(seats)) next
-      
+
       vlist <- unique(trimws(seats$villainId))
       vlist <- vlist[vlist != ""]
       if (length(vlist) < 2) next
-      
+
       winner_player <- trimws(game$winnerPlayer %||% "")
       if (winner_player == "" || !winner_player %in% seats$player) next
-      
+
       winner_vill <- trimws(seats$villainId[match(winner_player, seats$player)])
       if (winner_vill == "") next
-      
+
       # iterate unordered pairs (i < j)
       for (i in 1:(length(vlist) - 1)) {
         for (j in (i + 1):length(vlist)) {
           A <- vlist[i]
           B <- vlist[j]
-          
+
           keyAB <- paste0(A, "|||", B)
           keyBA <- paste0(B, "|||", A)
-          
+
           # Always count "present together"
           add_key(together_env, keyAB, 1)
           add_key(together_env, keyBA, 1)
-          
+
           # Only count H2H when winner is A or B
           if (winner_vill == A || winner_vill == B) {
             add_key(h2h_env, keyAB, 1)
             add_key(h2h_env, keyBA, 1)
-            
+
             # Winner gets the win against the other
             if (winner_vill == A) add_key(wins_env, keyAB, 1)
             if (winner_vill == B) add_key(wins_env, keyBA, 1)
@@ -1654,20 +2033,20 @@ server <- function(input, output, session) {
         }
       }
     }
-    
+
     keys <- ls(together_env)
     if (length(keys) == 0) return(data.frame())
-    
+
     out <- do.call(rbind, lapply(keys, function(k) {
       parts <- strsplit(k, "\\|\\|\\|")[[1]]
       A <- parts[1]; B <- parts[2]
-      
+
       games_together <- get(k, together_env)
       h2h_games <- if (exists(k, h2h_env, inherits = FALSE)) get(k, h2h_env) else 0
       wins <- if (exists(k, wins_env, inherits = FALSE)) get(k, wins_env) else 0
-      
+
       winrate <- if (h2h_games > 0) wins / h2h_games else NA_real_
-      
+
       data.frame(
         VillainId = A,
         OpponentId = B,
@@ -1677,26 +2056,26 @@ server <- function(input, output, session) {
         stringsAsFactors = FALSE
       )
     }))
-    
+
     # Filter on min H2H games (not "together")
     min_g <- input$mu_min_games %||% 2
     out <- out[out$H2HGames >= min_g, , drop = FALSE]
-    
+
     # Optional focus filter
     focus <- input$mu_focus %||% "all"
     if (focus != "all") out <- out[out$VillainId == focus, , drop = FALSE]
-    
+
     if (nrow(out) == 0) return(out)
-    
+
     out <- out[order(-out$H2HGames, -out$Winrate, -out$GamesTogether, out$VillainId, out$OpponentId), , drop = FALSE]
     out
   })
-  
+
   output$matchupTable <- renderReactable({
     df <- matchup_df()
     lang <- currentLang()
     if (nrow(df) == 0) {
-      empty_df <- data.frame(Villain = character(), Opponent = character(), GamesTogether = integer(), H2HGames = integer(), Winrate = character())
+      empty_df <- data.frame(Villain = character(), Opponent = character(), GamesTogether = integer(), H2HGames = integer(), Winrate = numeric())
       if (lang == "fr") names(empty_df) <- c("Vilain", "Adversaire", "Parties ensemble", "Parties H2H", "Winrate")
       return(build_reactable(
         empty_df,
@@ -1709,13 +2088,13 @@ server <- function(input, output, session) {
         )
       ))
     }
-    
+
     shown <- data.frame(
       Villain = vapply(df$VillainId, villain_label_html, character(1), lang = lang, size = 28, compact = TRUE),
       Opponent = vapply(df$OpponentId, villain_label_html, character(1), lang = lang, size = 28, compact = TRUE),
       GamesTogether = df$GamesTogether,
       H2HGames = df$H2HGames,
-      Winrate = format_pct_label(df$Winrate),
+      Winrate = df$Winrate,
       stringsAsFactors = FALSE
     )
     if (lang == "fr") names(shown) <- c("Vilain", "Adversaire", "Parties ensemble", "Parties H2H", "Winrate")
@@ -1731,22 +2110,22 @@ server <- function(input, output, session) {
         `Parties H2H` = colDef(align = "right"),
         GamesTogether = colDef(align = "right"),
         H2HGames = colDef(align = "right"),
-        Winrate = colDef(align = "right")
+        Winrate = winrate_pct_col_def(align = "right")
       )
     )
   })
-  
+
   # ✅ Heatmap ggplot2 + bg transparent (colors corrected)
   output$matchupHeatmap <- renderPlot({
     df <- matchup_df()
     lang <- currentLang()
-    
+
     if (is.null(df) || nrow(df) == 0) {
       par(bg = "#07150d", fg = "#e9eef6")
       plot.new(); text(0.5, 0.5, tr("not_enough_data"), col = "#cfe0ff", cex = 1.1)
       return()
     }
-    
+
     villains <- sort(unique(c(df$VillainId, df$OpponentId)))
     if (length(villains) < 2) {
       par(bg = "#07150d", fg = "#e9eef6")
@@ -1755,43 +2134,43 @@ server <- function(input, output, session) {
       text(0.5, 0.5, msg, col = "#cfe0ff", cex = 1.1)
       return()
     }
-    
+
     wrap1 <- function(s) {
       s <- as.character(s)
       if (nchar(s) > 14 && grepl(" ", s)) sub(" ", "\n", s) else s
     }
     lab <- vapply(villains, label_villain, character(1), lang = lang)
     lab <- vapply(lab, wrap1, character(1))
-    
+
     grid_df <- expand.grid(
       VillainId = villains,
       OpponentId = villains,
       stringsAsFactors = FALSE
     )
     grid_df$Winrate <- NA_real_
-    
+
     key <- paste(df$VillainId, df$OpponentId, sep = "|||")
     idx <- match(paste(grid_df$VillainId, grid_df$OpponentId, sep = "|||"), key)
     grid_df$Winrate[!is.na(idx)] <- df$Winrate[idx[!is.na(idx)]]
-    
+
     grid_df$Winrate[grid_df$VillainId == grid_df$OpponentId] <- NA_real_
-    
+
     grid_df$OpponentLab <- factor(vapply(grid_df$OpponentId, function(x) lab[match(x, villains)], character(1)), levels = lab)
     grid_df$VillainLab  <- factor(vapply(grid_df$VillainId,  function(x) lab[match(x, villains)], character(1)), levels = rev(lab))
-    
+
     n <- length(villains)
     txt <- if (n <= 8) 10 else if (n <= 12) 9 else 8
-    
+
     pal <- c(
       "#6b2230",  # 0%  -> bordeaux sombre (faible)
-      "#CB7A8A",  
+      "#CB7A8A",
       "#c3c3c3",   # 50% -> gris neutre (milieu)
       "#5DC382",
       "#2f7d4b"    # 100%-> vert Villainous (fort)
     )
-    
+
     na_col <- "#3a3a3a"  # ✅ “No data” (distinct de 0%)
-    
+
     p <- ggplot(grid_df, aes(x = OpponentLab, y = VillainLab, fill = Winrate)) +
       geom_tile(color = "#1f2a3a", linewidth = 0.4, na.rm = FALSE) +
       coord_fixed() +
@@ -1814,21 +2193,21 @@ server <- function(input, output, session) {
       ggplot2::theme(
         plot.background  = element_rect(fill = "transparent", color = NA),
         panel.background = element_rect(fill = "#07150d", color = NA),
-        
+
         panel.grid = element_blank(),
         axis.title = element_text(color = "#cfe0ff"),
         axis.text  = element_text(color = "#cfe0ff"),
         axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1),
         plot.title = element_text(color = "#e9eef6", face = "bold", size = 12, margin = margin(b = 10)),
-        
+
         legend.position = "right",
         legend.background = element_rect(fill = "transparent", color = NA),
         legend.key        = element_rect(fill = "transparent", color = NA),
-        
+
         legend.title = element_text(color = "#f3e7c3", face = "bold"),
         legend.text  = element_text(color = "#cfe0ff"),
         legend.margin = margin(l = 8),
-        
+
         legend.box.background = element_rect(
           fill = "transparent",
           color = adjustcolor("#2f7d4b", alpha.f = 0.45),
@@ -1844,30 +2223,30 @@ server <- function(input, output, session) {
         ticks.colour = "#cfe0ff",
         frame.colour = "#1f2a3a"
       ))
-    
+
     print(p)
   }, res = 96, bg = "transparent")
-  
+
   # -------- Prediction --------
   output$pred_seats_ui <- renderUI({
     n <- input$pred_numPlayers
     req(n)
-    
+
     v_choices <- villain_choices_named()
     p_choices <- known_players()
-    
+
     tagList(lapply(seq_len(n), function(i) {
       pid <- paste0("pred_player_", i)
       vid <- paste0("pred_villain_", i)
-      
+
       cp <- isolate(input[[pid]]); if (is.null(cp)) cp <- ""
       cv <- isolate(input[[vid]]); if (is.null(cv)) cv <- ""
-      
+
       v_choices2 <- v_choices
       if (!is.null(cv) && cv != "" && !(cv %in% v_choices2)) {
         v_choices2 <- c(v_choices2, setNames(cv, villain_label_html(cv, currentLang(), size = 22, compact = TRUE)))
       }
-      
+
       div(
         style = "margin-bottom: 12px;",
         layout_columns(
@@ -1883,31 +2262,31 @@ server <- function(input, output, session) {
       )
     }))
   })
-  
+
   pred_data <- eventReactive(input$pred_calc, {
     predMsg("")
     n <- input$pred_numPlayers %||% 4
     n <- max(2, min(6, as.integer(n)))
-    
+
     players <- sapply(seq_len(n), function(i) trimws(input[[paste0("pred_player_", i)]] %||% ""))
     villains <- sapply(seq_len(n), function(i) trimws(input[[paste0("pred_villain_", i)]] %||% ""))
-    
+
     if (any(players == "") || any(villains == "")) { predMsg(tr("pred_fill_all")); return(NULL) }
     if (length(unique(players)) != length(players)) { predMsg(tr("pred_unique_players")); return(NULL) }
     if (any(!villains %in% available_villain_ids())) { predMsg(tr("pred_villain_invalid")); return(NULL) }
-    
+
     pr <- elo_res()$playerRatings
     vr <- elo_res()$villainRatings
     base <- elo_cfg$baseRating
-    
+
     eloP <- sapply(players, function(p) if (p %in% names(pr)) pr[p] else base)
     eloV <- sapply(villains, function(v) if (v %in% names(vr)) vr[v] else base)
     eloT <- as.numeric(eloP) + as.numeric(eloV)
-    
+
     scale <- elo_cfg$scale
     s <- 10^(eloT / scale)
     prob <- s / sum(s)
-    
+
     data.frame(
       Seat = paste0("#", seq_len(n)),
       Player = players,
@@ -1920,7 +2299,7 @@ server <- function(input, output, session) {
       stringsAsFactors = FALSE
     )
   }, ignoreInit = FALSE)
-  
+
   output$predTable <- renderReactable({
     df <- pred_data()
     if (is.null(df) || nrow(df) == 0) {
@@ -1950,7 +2329,7 @@ server <- function(input, output, session) {
       )
     )
   })
-  
+
   output$predPlot <- renderPlot({
     df <- pred_data()
     if (is.null(df) || nrow(df) == 0) {
@@ -1962,13 +2341,13 @@ server <- function(input, output, session) {
            col = "#cfe0ff", cex = 1.1)
       return()
     }
-    
+
     labels <- paste0(df$Player, "\n(", df$Villain, ")")
     vals <- df$Prob_pct
-    
+
     par(bg = "#07150d", fg = "#e9eef6", col.axis = "#cfe0ff", col.lab = "#cfe0ff",
         col.main = "#e9eef6", mar = c(8, 4, 3, 2))
-    
+
     bp <- barplot(vals,
                   names.arg = labels,
                   las = 2,
@@ -1982,9 +2361,9 @@ server <- function(input, output, session) {
     grid(col = "#1f2a3a", lty = 3)
     text(bp, vals + 2, labels = paste0(vals, "%"), col = "#f3e7c3", cex = 0.9)
   })
-  
+
   output$predMsg <- renderText(predMsg())
-  
+
   # -------- Data / history / edit / import / export --------
   output$historyTable <- renderReactable({
     g <- games()
@@ -2017,14 +2396,14 @@ server <- function(input, output, session) {
       )
     )
   })
-  
+
   observeEvent(input$resetAll, {
     games(list())
     save_rds_safe(list(), rds_path)
     errorMsg(""); dataMsg("")
     showNotification(tr("data_cleared"), type = "message", duration = 2)
   })
-  
+
   output$exportJSON <- downloadHandler(
     filename = function() paste0("villainous-elo-games-", Sys.Date(), ".json"),
     content = function(file) {
@@ -2043,23 +2422,23 @@ server <- function(input, output, session) {
       writeLines(toJSON(exportable, auto_unbox = TRUE, pretty = TRUE), file)
     }
   )
-  
+
   observeEvent(input$importJSON, {
     dataMsg(""); errorMsg("")
     req(input$importJSON$datapath)
-    
+
     txt <- try(readLines(input$importJSON$datapath, warn = FALSE), silent = TRUE)
     if (inherits(txt, "try-error")) { dataMsg(tr("import_unreadable")); return() }
-    
+
     parsed <- try(fromJSON(paste(txt, collapse = "\n"), simplifyVector = FALSE), silent = TRUE)
     if (inherits(parsed, "try-error") || !is.list(parsed)) { dataMsg(tr("import_invalid")); return() }
-    
+
     norm <- list()
     for (g in parsed) {
       if (is.null(g$id) || is.null(g$playedAt) || is.null(g$winnerPlayer) || is.null(g$seats)) next
       dur <- g$durationMin %||% g$durationMinutes %||% NA_integer_
       dur <- suppressWarnings(as.integer(dur))
-      
+
       seats <- g$seats
       if (!is.data.frame(seats)) {
         if (is.list(seats)) {
@@ -2068,9 +2447,9 @@ server <- function(input, output, session) {
           seats <- data.frame(player = players, villainId = vids, stringsAsFactors = FALSE)
         } else next
       }
-      
+
       seats$villainId <- villain_to_id(seats$villainId)
-      
+
       norm <- c(norm, list(list(
         id = as.character(g$id),
         playedAt = as.character(g$playedAt),
@@ -2083,13 +2462,13 @@ server <- function(input, output, session) {
         )
       )))
     }
-    
+
     norm <- normalize_games(norm)
     games(norm)
     save_rds_safe(norm, rds_path)
     showNotification(tr("import_done"), type = "message", duration = 2.5)
   })
-  
+
   observe({
     g <- games()
     if (length(g) == 0) {
@@ -2100,7 +2479,7 @@ server <- function(input, output, session) {
     choices <- setNames(sapply(g, `[[`, "id"), labels)
     updateSelectInput(session, "editGameId", choices = choices, selected = g[[length(g)]]$id)
   })
-  
+
   selected_game <- reactive({
     gid <- input$editGameId %||% ""
     g <- games()
@@ -2109,7 +2488,7 @@ server <- function(input, output, session) {
     if (length(idx) != 1) return(NULL)
     g[[idx]]
   })
-  
+
   observeEvent(selected_game(), {
     sg <- selected_game()
     if (is.null(sg)) return()
@@ -2117,33 +2496,33 @@ server <- function(input, output, session) {
     updateNumericInput(session, "editDurationMin", value = as.integer(sg$durationMin %||% 60))
     updateNumericInput(session, "editNumPlayers", value = nrow(sg$seats))
   })
-  
+
   output$editSeatsUI <- renderUI({
     sg <- selected_game()
     if (is.null(sg)) return(tags$div(class = "small-muted", tr("no_game_selected")))
-    
+
     n <- input$editNumPlayers %||% nrow(sg$seats)
     n <- max(2, min(6, as.integer(n)))
-    
+
     p_choices <- unique(c(known_players(), sg$seats$player))
     v_choices <- villain_choices_named()
     lang <- currentLang()
-    
+
     tagList(lapply(seq_len(n), function(i) {
       pid <- paste0("edit_player_", i)
       vid <- paste0("edit_villain_", i)
-      
+
       cur_p <- isolate(input[[pid]])
       cur_v <- isolate(input[[vid]])
-      
+
       if (is.null(cur_p) || cur_p == "") cur_p <- if (i <= nrow(sg$seats)) sg$seats$player[i] else ""
       if (is.null(cur_v) || cur_v == "") cur_v <- if (i <= nrow(sg$seats)) sg$seats$villainId[i] else ""
-      
+
       v_choices2 <- v_choices
       if (!is.null(cur_v) && cur_v != "" && !(cur_v %in% v_choices2)) {
         v_choices2 <- c(v_choices2, setNames(cur_v, villain_label_html(cur_v, lang, size = 22, compact = TRUE)))
       }
-      
+
       div(
         style = "margin-bottom: 12px;",
         layout_columns(
@@ -2159,13 +2538,13 @@ server <- function(input, output, session) {
       )
     }))
   })
-  
+
   observe({
     sg <- selected_game()
     if (is.null(sg)) return()
     n <- input$editNumPlayers %||% nrow(sg$seats)
     n <- max(2, min(6, as.integer(n)))
-    
+
     players <- sapply(seq_len(n), function(i) trimws(input[[paste0("edit_player_", i)]] %||% ""))
     players <- players[players != ""]
     if (length(players) == 0) {
@@ -2176,46 +2555,46 @@ server <- function(input, output, session) {
       updateSelectInput(session, "editWinner", label = tr("winner"), choices = players, selected = sel)
     }
   })
-  
+
   observeEvent(input$applyEdit, {
     dataMsg("")
     sg <- selected_game()
     if (is.null(sg)) { dataMsg(tr("no_game_selected")); return() }
-    
+
     n <- input$editNumPlayers %||% nrow(sg$seats)
     n <- max(2, min(6, as.integer(n)))
-    
+
     players <- sapply(seq_len(n), function(i) trimws(input[[paste0("edit_player_", i)]] %||% ""))
     villains <- sapply(seq_len(n), function(i) trimws(input[[paste0("edit_villain_", i)]] %||% ""))
-    
+
     keep <- players != "" & villains != ""
     players <- players[keep]
     villains <- villains[keep]
-    
+
     if (length(players) < 2 || length(players) > 6) { dataMsg(tr("err_need_seats")); return() }
     if (length(unique(players)) != length(players)) { dataMsg(tr("duplicates_in_game")); return() }
     if (any(!villains %in% villains_tbl$villain_id)) { dataMsg(tr("invalid_villain_catalog")); return() }
-    
+
     winner <- trimws(input$editWinner %||% "")
     if (winner == "" || !winner %in% players) { dataMsg(tr("invalid_winner")); return() }
-    
+
     dur <- suppressWarnings(as.integer(input$editDurationMin %||% NA_integer_))
     if (!is.na(dur) && dur < 5) { dataMsg(tr("err_duration_invalid")); return() }
-    
+
     g <- games()
     idx <- which(sapply(g, `[[`, "id") == sg$id)
     if (length(idx) != 1) { dataMsg(tr("game_not_found")); return() }
-    
+
     g[[idx]]$playedAt <- as.character(as.Date(input$editPlayedAt))
     g[[idx]]$durationMin <- dur
     g[[idx]]$winnerPlayer <- winner
     g[[idx]]$seats <- data.frame(player = players, villainId = villains, stringsAsFactors = FALSE)
-    
+
     games(g)
     save_rds_safe(g, rds_path)
     showNotification(tr("changes_saved"), type = "message", duration = 2.5)
   })
-  
+
   observeEvent(input$deleteGame, {
     dataMsg("")
     sg <- selected_game()
@@ -2226,7 +2605,7 @@ server <- function(input, output, session) {
     save_rds_safe(g, rds_path)
     showNotification(tr("game_deleted"), type = "message", duration = 2.5)
   })
-  
+
   output$errorMsg <- renderText(errorMsg())
   output$dataMsg  <- renderText(dataMsg())
 }

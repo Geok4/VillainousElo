@@ -1,300 +1,261 @@
 # R/05_profiles.R
-# R/05_profiles.R
-build_profiles <- function(games, normalize_by_players = TRUE) {
-  if (length(games) == 0) {
+
+profile_rows_from_log <- function(elo_log, normalize_by_players = TRUE) {
+  if (is.null(elo_log) || !is.data.frame(elo_log) || nrow(elo_log) == 0) {
+    return(data.frame())
+  }
+
+  df <- elo_log
+  df$player <- trimws(as.character(df$player %||% ""))
+  df$villainId <- villain_to_id(df$villainId %||% "")
+  df$nPlayers <- suppressWarnings(as.integer(df$nPlayers %||% NA_integer_))
+  df$Win <- as.integer(as.logical(df$isWinner %||% FALSE))
+  df$ExpectedWin <- suppressWarnings(as.numeric(df$p_win_villain %||% NA_real_))
+  df$ChanceWin <- ifelse(!is.na(df$nPlayers) & df$nPlayers > 0, 1 / df$nPlayers, NA_real_)
+  df$ExpectedWin[is.na(df$ExpectedWin)] <- df$ChanceWin[is.na(df$ExpectedWin)]
+
+  dur <- suppressWarnings(as.numeric(df$durationMin %||% NA_real_))
+  if (normalize_by_players) {
+    df$duration <- ifelse(
+      !is.na(dur) & dur > 0 & !is.na(df$nPlayers) & df$nPlayers > 0,
+      dur / df$nPlayers,
+      NA_real_
+    )
+  } else {
+    df$duration <- ifelse(!is.na(dur) & dur > 0, dur, NA_real_)
+  }
+
+  keep <- !is.na(df$nPlayers) &
+    df$nPlayers >= 2L & df$nPlayers <= 6L &
+    df$player != "" &
+    df$villainId != ""
+
+  df <- df[keep, c("gameId", "nPlayers", "player", "villainId", "Win", "ExpectedWin", "ChanceWin", "duration"), drop = FALSE]
+  rownames(df) <- NULL
+  df
+}
+
+aggregate_duration_mean <- function(df, column_name) {
+  if (nrow(df) == 0) {
+    out <- data.frame(key = character(), value = numeric(), stringsAsFactors = FALSE)
+  } else {
+    out <- aggregate(
+      duration ~ key,
+      df,
+      function(x) if (all(is.na(x))) NA_real_ else mean(x, na.rm = TRUE)
+    )
+  }
+  names(out)[2] <- column_name
+  out
+}
+
+aggregate_profile_metrics <- function(df, key_col) {
+  if (nrow(df) == 0) return(data.frame())
+
+  rows <- data.frame(
+    key = as.character(df[[key_col]]),
+    Win = as.integer(df$Win),
+    ExpectedWin = as.numeric(df$ExpectedWin),
+    ChanceWin = as.numeric(df$ChanceWin),
+    duration = as.numeric(df$duration),
+    stringsAsFactors = FALSE
+  )
+
+  Games <- aggregate(Win ~ key, rows, length)
+  names(Games)[2] <- "Games"
+
+  Wins <- aggregate(Win ~ key, rows, sum)
+  names(Wins)[2] <- "Wins"
+
+  ExpectedWins <- aggregate(ExpectedWin ~ key, rows, sum)
+  names(ExpectedWins)[2] <- "ExpectedWins"
+
+  ChanceWins <- aggregate(ChanceWin ~ key, rows, sum)
+  names(ChanceWins)[2] <- "ChanceWins"
+
+  out <- Reduce(
+    function(a, b) merge(a, b, by = "key", all = TRUE),
+    list(Games, Wins, ExpectedWins, ChanceWins)
+  )
+
+  out$Winrate <- ifelse(out$Games > 0, out$Wins / out$Games, NA_real_)
+  out$BaselineWinrate <- ifelse(out$Games > 0, out$ChanceWins / out$Games, NA_real_)
+  out$ExpectedWinrate <- ifelse(out$Games > 0, out$ExpectedWins / out$Games, NA_real_)
+  out$DeltaWinrate <- ifelse(out$Games > 0, out$Winrate - out$ExpectedWinrate, NA_real_)
+  out$AdjustedWinrate <- ifelse(
+    out$Games > 0,
+    out$Winrate - out$ExpectedWinrate + out$BaselineWinrate,
+    NA_real_
+  )
+
+  out$AboveChance <- out$Wins - out$ChanceWins
+  out$ChanceAdjWinrate <- ifelse(out$Games > 0, out$AboveChance / out$Games, NA_real_)
+  out$AdjWinrate <- out$AdjustedWinrate
+  out$SkillIndex <- ifelse(out$ExpectedWins > 0, out$Wins / out$ExpectedWins, NA_real_)
+
+  win_d <- rows[rows$Win == 1L, c("key", "duration"), drop = FALSE]
+  los_d <- rows[rows$Win == 0L, c("key", "duration"), drop = FALSE]
+
+  out <- merge(out, aggregate_duration_mean(win_d, "AvgWin"), by = "key", all.x = TRUE)
+  out <- merge(out, aggregate_duration_mean(los_d, "AvgLoss"), by = "key", all.x = TRUE)
+
+  out
+}
+
+build_profiles <- function(elo_log, normalize_by_players = TRUE) {
+  rows <- profile_rows_from_log(elo_log, normalize_by_players = normalize_by_players)
+  if (nrow(rows) == 0) {
     return(list(players = data.frame(), villains = data.frame()))
   }
-  
-  rows_p <- list()
-  rows_v <- list()
-  
-  for (g in games) {
-    seats <- g$seats
-    if (is.null(seats) || !is.data.frame(seats)) next
-    
-    seats$player <- trimws(as.character(seats$player))
-    seats$villainId <- trimws(as.character(seats$villainId))
-    seats <- seats[seats$player != "" & seats$villainId != "", , drop = FALSE]
-    
-    n <- nrow(seats)
-    if (n < 2 || n > 6) next
-    
-    winnerP <- trimws(g$winnerPlayer %||% "")
-    if (!winnerP %in% seats$player) next
-    
-    dur <- suppressWarnings(as.integer(g$durationMin %||% NA_integer_))
-    dur_metric <- if (!is.na(dur) && dur > 0) {
-      if (normalize_by_players) dur / n else dur
-    } else NA_real_
-    
-    chance <- 1 / n
-    winnerV <- seats$villainId[match(winnerP, seats$player)]
-    
-    # players
-    for (i in seq_len(n)) {
-      p <- seats$player[i]
-      win <- (p == winnerP)
-      rows_p[[length(rows_p) + 1]] <- data.frame(
-        key = p,
-        Win = as.integer(win),
-        Chance = chance,
-        duration = dur_metric,
-        stringsAsFactors = FALSE
-      )
-    }
-    
-    # villains (each villain in seats is a participant; winner villain = winnerV)
-    for (i in seq_len(n)) {
-      v <- seats$villainId[i]
-      win <- (v == winnerV)
-      rows_v[[length(rows_v) + 1]] <- data.frame(
-        key = v,
-        Win = as.integer(win),
-        Chance = chance,
-        duration = dur_metric,
-        stringsAsFactors = FALSE
-      )
-    }
-  }
-  
-  dfp <- if (length(rows_p) > 0) do.call(rbind, rows_p) else data.frame()
-  dfv <- if (length(rows_v) > 0) do.call(rbind, rows_v) else data.frame()
-  
-  agg_profile <- function(df) {
-    if (nrow(df) == 0) return(data.frame())
-    
-    Games <- aggregate(Win ~ key, df, length); names(Games)[2] <- "Games"
-    Wins  <- aggregate(Win ~ key, df, sum);   names(Wins)[2]  <- "Wins"
-    ExpW  <- aggregate(Chance ~ key, df, sum); names(ExpW)[2] <- "ExpWins"
-    
-    out <- Reduce(function(a,b) merge(a,b, by="key", all=TRUE), list(Games, Wins, ExpW))
-    out$Winrate <- ifelse(out$Games > 0, out$Wins / out$Games, NA_real_)
-    
-    # ✅ equitable across N: baseline = 1/N per game
-    out$AboveChance <- out$Wins - out$ExpWins
-    out$AdjWinrate  <- ifelse(out$Games > 0, out$AboveChance / out$Games, NA_real_)
-    out$SkillIndex  <- ifelse(out$ExpWins > 0, out$Wins / out$ExpWins, NA_real_)  # >1 = better than chance
-    
-    win_d <- df[df$Win == 1, , drop=FALSE]
-    los_d <- df[df$Win == 0, , drop=FALSE]
-    
-    mean_win <- aggregate(duration ~ key, win_d, function(x) if (all(is.na(x))) NA_real_ else mean(x, na.rm=TRUE))
-    mean_los <- aggregate(duration ~ key, los_d, function(x) if (all(is.na(x))) NA_real_ else mean(x, na.rm=TRUE))
-    names(mean_win)[2] <- "AvgWin"
-    names(mean_los)[2] <- "AvgLoss"
-    
-    out <- merge(out, mean_win, by="key", all.x=TRUE)
-    out <- merge(out, mean_los, by="key", all.x=TRUE)
-    
-    out
-  }
-  
-  list(players = agg_profile(dfp), villains = agg_profile(dfv))
+
+  list(
+    players = aggregate_profile_metrics(rows, "player"),
+    villains = aggregate_profile_metrics(rows, "villainId")
+  )
 }
 
-build_villain_detail <- function(games, villain_id, player_count = NULL) {
-  if (length(games) == 0 || is.null(villain_id) || villain_id == "") {
-    return(list(
-      summary = data.frame(
-        villainId = character(),
-        Games = integer(),
-        Wins = integer(),
-        Winrate = numeric(),
-        stringsAsFactors = FALSE
-      ),
-      by_player = data.frame(
-        Rank = integer(),
-        Player = character(),
-        Games = integer(),
-        Wins = integer(),
-        Winrate = numeric(),
-        stringsAsFactors = FALSE
-      )
-    ))
+build_villain_detail <- function(elo_log, villain_id, player_count = NULL, normalize_by_players = TRUE) {
+  empty <- list(
+    summary = data.frame(
+      villainId = character(),
+      Games = integer(),
+      Wins = integer(),
+      Winrate = numeric(),
+      AdjustedWinrate = numeric(),
+      ExpectedWinrate = numeric(),
+      DeltaWinrate = numeric(),
+      stringsAsFactors = FALSE
+    ),
+    by_player = data.frame(
+      Rank = integer(),
+      Player = character(),
+      Games = integer(),
+      Wins = integer(),
+      Winrate = numeric(),
+      AdjustedWinrate = numeric(),
+      ExpectedWinrate = numeric(),
+      DeltaWinrate = numeric(),
+      stringsAsFactors = FALSE
+    )
+  )
+
+  if (is.null(villain_id) || villain_id == "") return(empty)
+
+  rows <- profile_rows_from_log(elo_log, normalize_by_players = normalize_by_players)
+  if (nrow(rows) == 0) return(empty)
+
+  if (!is.null(player_count) && !is.na(player_count)) {
+    rows <- rows[rows$nPlayers == as.integer(player_count), , drop = FALSE]
   }
-  
-  rows <- list()
-  
-  for (g in games) {
-    seats <- g$seats
-    if (is.null(seats) || !is.data.frame(seats)) next
-    
-    # Compatibilité ancien format / nouveau format
-    if (!("villainId" %in% names(seats))) {
-      if ("villain" %in% names(seats)) {
-        seats$villainId <- villain_to_id(seats$villain)
-      } else {
-        seats$villainId <- ""
-      }
-    }
-    
-    seats$player <- trimws(as.character(seats$player))
-    seats$villainId <- villain_to_id(seats$villainId)
-    seats <- seats[seats$player != "" & seats$villainId != "", c("player", "villainId"), drop = FALSE]
-    
-    n <- nrow(seats)
-    if (n < 2 || n > 6) next
-    if (!is.null(player_count) && !is.na(player_count) && n != as.integer(player_count)) next
-    
-    winnerP <- trimws(g$winnerPlayer %||% "")
-    if (!winnerP %in% seats$player) next
-    
-    idx <- which(seats$villainId == villain_id)
-    if (length(idx) == 0) next
-    
-    winnerV <- seats$villainId[match(winnerP, seats$player)]
-    
-    for (i in idx) {
-      rows[[length(rows) + 1]] <- data.frame(
-        player = seats$player[i],
-        Games = 1L,
-        Wins = as.integer(winnerV == villain_id),
-        stringsAsFactors = FALSE
-      )
-    }
+  rows <- rows[rows$villainId == villain_id, , drop = FALSE]
+
+  if (nrow(rows) == 0) {
+    empty$summary <- data.frame(
+      villainId = villain_id,
+      Games = 0L,
+      Wins = 0L,
+      Winrate = NA_real_,
+      AdjustedWinrate = NA_real_,
+      ExpectedWinrate = NA_real_,
+      DeltaWinrate = NA_real_,
+      stringsAsFactors = FALSE
+    )
+    return(empty)
   }
-  
-  if (length(rows) == 0) {
-    return(list(
-      summary = data.frame(
-        villainId = villain_id,
-        Games = 0L,
-        Wins = 0L,
-        Winrate = NA_real_,
-        stringsAsFactors = FALSE
-      ),
-      by_player = data.frame(
-        Rank = integer(),
-        Player = character(),
-        Games = integer(),
-        Wins = integer(),
-        Winrate = numeric(),
-        stringsAsFactors = FALSE
-      )
-    ))
-  }
-  
-  df <- do.call(rbind, rows)
-  
-  by_player <- aggregate(cbind(Games, Wins) ~ player, data = df, FUN = sum)
-  by_player$Winrate <- ifelse(by_player$Games > 0, by_player$Wins / by_player$Games, NA_real_)
-  by_player <- by_player[order(-by_player$Winrate, -by_player$Games, by_player$player), , drop = FALSE]
+
+  by_player <- aggregate_profile_metrics(rows, "player")
+  by_player <- by_player[order(-by_player$AdjustedWinrate, -by_player$Winrate, -by_player$Games, by_player$key), , drop = FALSE]
   by_player$Rank <- seq_len(nrow(by_player))
-  by_player <- by_player[, c("Rank", "player", "Games", "Wins", "Winrate")]
-  names(by_player) <- c("Rank", "Player", "Games", "Wins", "Winrate")
-  
+  by_player <- by_player[, c("Rank", "key", "Games", "Wins", "Winrate", "AdjustedWinrate", "ExpectedWinrate", "DeltaWinrate")]
+  names(by_player) <- c("Rank", "Player", "Games", "Wins", "Winrate", "AdjustedWinrate", "ExpectedWinrate", "DeltaWinrate")
+
+  baseline_winrate <- mean(rows$ChanceWin)
+  expected_winrate <- mean(rows$ExpectedWin)
+  winrate <- mean(rows$Win)
+
   summary <- data.frame(
     villainId = villain_id,
-    Games = sum(df$Games),
-    Wins = sum(df$Wins),
-    Winrate = sum(df$Wins) / sum(df$Games),
+    Games = nrow(rows),
+    Wins = sum(rows$Win),
+    Winrate = winrate,
+    AdjustedWinrate = winrate - expected_winrate + baseline_winrate,
+    ExpectedWinrate = expected_winrate,
+    DeltaWinrate = winrate - expected_winrate,
     stringsAsFactors = FALSE
   )
-  
-  list(
-    summary = summary,
-    by_player = by_player
-  )
+
+  list(summary = summary, by_player = by_player)
 }
 
-build_player_detail <- function(games, player_id, player_count = NULL) {
-  if (length(games) == 0 || is.null(player_id) || player_id == "") {
-    return(list(
-      summary = data.frame(
-        playerId = character(),
-        Games = integer(),
-        Wins = integer(),
-        Winrate = numeric(),
-        stringsAsFactors = FALSE
-      ),
-      by_villain = data.frame(
-        Rank = integer(),
-        VillainId = character(),
-        Games = integer(),
-        Wins = integer(),
-        Winrate = numeric(),
-        stringsAsFactors = FALSE
-      )
-    ))
+build_player_detail <- function(elo_log, player_id, player_count = NULL, normalize_by_players = TRUE) {
+  empty <- list(
+    summary = data.frame(
+      playerId = character(),
+      Games = integer(),
+      Wins = integer(),
+      Winrate = numeric(),
+      AdjustedWinrate = numeric(),
+      ExpectedWinrate = numeric(),
+      DeltaWinrate = numeric(),
+      stringsAsFactors = FALSE
+    ),
+    by_villain = data.frame(
+      Rank = integer(),
+      VillainId = character(),
+      Games = integer(),
+      Wins = integer(),
+      Winrate = numeric(),
+      AdjustedWinrate = numeric(),
+      ExpectedWinrate = numeric(),
+      DeltaWinrate = numeric(),
+      stringsAsFactors = FALSE
+    )
+  )
+
+  if (is.null(player_id) || player_id == "") return(empty)
+
+  rows <- profile_rows_from_log(elo_log, normalize_by_players = normalize_by_players)
+  if (nrow(rows) == 0) return(empty)
+
+  if (!is.null(player_count) && !is.na(player_count)) {
+    rows <- rows[rows$nPlayers == as.integer(player_count), , drop = FALSE]
   }
-  
-  rows <- list()
-  
-  for (g in games) {
-    seats <- g$seats
-    if (is.null(seats) || !is.data.frame(seats)) next
-    
-    if (!("villainId" %in% names(seats))) {
-      if ("villain" %in% names(seats)) {
-        seats$villainId <- villain_to_id(seats$villain)
-      } else {
-        seats$villainId <- ""
-      }
-    }
-    
-    seats$player <- trimws(as.character(seats$player))
-    seats$villainId <- villain_to_id(seats$villainId)
-    seats <- seats[seats$player != "" & seats$villainId != "", c("player", "villainId"), drop = FALSE]
-    
-    n <- nrow(seats)
-    if (n < 2 || n > 6) next
-    if (!is.null(player_count) && !is.na(player_count) && n != as.integer(player_count)) next
-    
-    winnerP <- trimws(g$winnerPlayer %||% "")
-    if (!winnerP %in% seats$player) next
-    
-    idx <- which(seats$player == player_id)
-    if (length(idx) == 0) next
-    
-    for (i in idx) {
-      rows[[length(rows) + 1]] <- data.frame(
-        villainId = seats$villainId[i],
-        Games = 1L,
-        Wins = as.integer(winnerP == player_id),
-        stringsAsFactors = FALSE
-      )
-    }
+  rows <- rows[rows$player == player_id, , drop = FALSE]
+
+  if (nrow(rows) == 0) {
+    empty$summary <- data.frame(
+      playerId = player_id,
+      Games = 0L,
+      Wins = 0L,
+      Winrate = NA_real_,
+      AdjustedWinrate = NA_real_,
+      ExpectedWinrate = NA_real_,
+      DeltaWinrate = NA_real_,
+      stringsAsFactors = FALSE
+    )
+    return(empty)
   }
-  
-  if (length(rows) == 0) {
-    return(list(
-      summary = data.frame(
-        playerId = player_id,
-        Games = 0L,
-        Wins = 0L,
-        Winrate = NA_real_,
-        stringsAsFactors = FALSE
-      ),
-      by_villain = data.frame(
-        Rank = integer(),
-        VillainId = character(),
-        Games = integer(),
-        Wins = integer(),
-        Winrate = numeric(),
-        stringsAsFactors = FALSE
-      )
-    ))
-  }
-  
-  df <- do.call(rbind, rows)
-  
-  by_villain <- aggregate(cbind(Games, Wins) ~ villainId, data = df, FUN = sum)
-  by_villain$Winrate <- ifelse(by_villain$Games > 0, by_villain$Wins / by_villain$Games, NA_real_)
-  by_villain <- by_villain[order(-by_villain$Winrate, -by_villain$Games, by_villain$villainId), , drop = FALSE]
+
+  by_villain <- aggregate_profile_metrics(rows, "villainId")
+  by_villain <- by_villain[order(-by_villain$AdjustedWinrate, -by_villain$Winrate, -by_villain$Games, by_villain$key), , drop = FALSE]
   by_villain$Rank <- seq_len(nrow(by_villain))
-  by_villain <- by_villain[, c("Rank", "villainId", "Games", "Wins", "Winrate")]
-  names(by_villain) <- c("Rank", "VillainId", "Games", "Wins", "Winrate")
-  
+  by_villain <- by_villain[, c("Rank", "key", "Games", "Wins", "Winrate", "AdjustedWinrate", "ExpectedWinrate", "DeltaWinrate")]
+  names(by_villain) <- c("Rank", "VillainId", "Games", "Wins", "Winrate", "AdjustedWinrate", "ExpectedWinrate", "DeltaWinrate")
+
+  baseline_winrate <- mean(rows$ChanceWin)
+  expected_winrate <- mean(rows$ExpectedWin)
+  winrate <- mean(rows$Win)
+
   summary <- data.frame(
     playerId = player_id,
-    Games = sum(df$Games),
-    Wins = sum(df$Wins),
-    Winrate = sum(df$Wins) / sum(df$Games),
+    Games = nrow(rows),
+    Wins = sum(rows$Win),
+    Winrate = winrate,
+    AdjustedWinrate = winrate - expected_winrate + baseline_winrate,
+    ExpectedWinrate = expected_winrate,
+    DeltaWinrate = winrate - expected_winrate,
     stringsAsFactors = FALSE
   )
-  
-  list(
-    summary = summary,
-    by_villain = by_villain
-  )
+
+  list(summary = summary, by_villain = by_villain)
 }

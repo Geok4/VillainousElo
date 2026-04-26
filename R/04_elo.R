@@ -75,6 +75,8 @@ compute_elo <- function(
     # softmax probabilities
     q <- 10^(combined / scale)
     probs <- q / sum(q)
+    q_villain <- 10^(v_before / scale)
+    probs_villain <- q_villain / sum(q_villain)
     
     # observed scores (1 winner else 0)
     S <- ifelse(seats$player == winner, 1, 0)
@@ -108,8 +110,10 @@ compute_elo <- function(
           player = p,
           villainId = v,
           isWinner = (p == winner),
+          villain_before = v_before[i],
           combined_before = combined[i],
           p_win = probs[i],
+          p_win_villain = probs_villain[i],
           K_eff = K_eff,
           d_combined = d_combined[i],
           d_player = d_p,

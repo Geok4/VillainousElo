@@ -130,6 +130,83 @@ input[type='checkbox']{
   box-shadow: 0 0 0 0.18rem rgba(47,125,75,0.22) !important;
 }
 
+/* Inputs / selects */
+.form-control,
+.form-select,
+input[type='text'],
+input[type='number'],
+input[type='date'],
+select {
+  background: linear-gradient(180deg, rgba(21,37,28,0.96) 0%, rgba(14,24,18,0.96) 100%) !important;
+  color: #eef5ec !important;
+  border: 1px solid rgba(216,197,138,0.18) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.03) !important;
+}
+.form-control::placeholder,
+input::placeholder {
+  color: rgba(233,238,246,0.55) !important;
+}
+.form-control:focus,
+.form-select:focus,
+input[type='text']:focus,
+input[type='number']:focus,
+input[type='date']:focus,
+select:focus {
+  background: linear-gradient(180deg, rgba(24,44,32,0.98) 0%, rgba(16,30,22,0.98) 100%) !important;
+  color: #ffffff !important;
+  border-color: rgba(216,197,138,0.34) !important;
+  box-shadow: 0 0 0 0.18rem rgba(47,125,75,0.18), inset 0 1px 0 rgba(255,255,255,0.04) !important;
+}
+.selectize-control.single .selectize-input,
+.selectize-control.multi .selectize-input {
+  background: linear-gradient(180deg, rgba(21,37,28,0.96) 0%, rgba(14,24,18,0.96) 100%) !important;
+  border: 1px solid rgba(216,197,138,0.18) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.03) !important;
+  color: #eef5ec !important;
+}
+.selectize-control.single .selectize-input.focus,
+.selectize-control.multi .selectize-input.focus {
+  background: linear-gradient(180deg, rgba(24,44,32,0.98) 0%, rgba(16,30,22,0.98) 100%) !important;
+  border-color: rgba(216,197,138,0.34) !important;
+  box-shadow: 0 0 0 0.18rem rgba(47,125,75,0.18), inset 0 1px 0 rgba(255,255,255,0.04) !important;
+}
+.selectize-control.single .selectize-input > input,
+.selectize-control.multi .selectize-input > input,
+.selectize-control.single .selectize-input .item,
+.selectize-control.multi .selectize-input .item {
+  color: #eef5ec !important;
+}
+.selectize-control.single .selectize-input > input,
+.selectize-control.multi .selectize-input > input {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+.selectize-control.single .selectize-input::after,
+.selectize-control.multi .selectize-input::after {
+  border-top-color: rgba(216,197,138,0.72) !important;
+}
+.selectize-control.single .selectize-input.dropdown-active::after,
+.selectize-control.multi .selectize-input.dropdown-active::after {
+  border-top-color: rgba(243,231,195,0.92) !important;
+}
+.selectize-dropdown,
+.selectize-dropdown.form-control {
+  background: rgba(11,20,15,0.98) !important;
+  border: 1px solid rgba(216,197,138,0.18) !important;
+  color: #eef5ec !important;
+}
+.selectize-dropdown .option,
+.selectize-dropdown .active {
+  color: #eef5ec !important;
+}
+.selectize-dropdown .option.active,
+.selectize-dropdown .active {
+  background: rgba(47,125,75,0.22) !important;
+}
+
 /* =========================================================
    Branding / Title
    ========================================================= */
@@ -201,6 +278,9 @@ input[type='checkbox']{
   align-items: center;
   min-height: 26px;
 }
+.selectize-control.single .selectize-input > input {
+  width: 1px !important;
+}
 .villain-selectize-entry {
   display: flex;
   align-items: center;
@@ -224,6 +304,14 @@ input[type='checkbox']{
 .selectize-dropdown-content .villain-avatar-shell {
   margin-top: 0;
   margin-bottom: 0;
+}
+input[type='number']::-webkit-outer-spin-button,
+input[type='number']::-webkit-inner-spin-button {
+  opacity: 1;
+  filter: invert(84%) sepia(14%) saturate(470%) hue-rotate(355deg) brightness(91%) contrast(91%);
+}
+input[type='number'] {
+  color-scheme: dark;
 }
 
 .villain-focus-filter { min-height: 0 !important; }
@@ -329,6 +417,31 @@ input[type='checkbox']{
 .villain-focus-kpi-card .kpi-label {
   margin-top: 2px;
 }
+.villain-focus-kpi-substats {
+  display: grid;
+  gap: 4px;
+  margin-top: 8px;
+}
+.villain-focus-kpi-substat {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 11px;
+}
+.villain-focus-kpi-substat-label {
+  color: rgba(216,197,138,0.82);
+  font-size: 10px;
+  letter-spacing: 0.35px;
+  text-transform: uppercase;
+}
+.villain-focus-kpi-substat .shiny-text-output,
+.villain-focus-kpi-substat span[id] {
+  display: inline;
+  margin: 0;
+  font-weight: 700;
+  color: #f4f7fb;
+}
 .villain-focus-kpi-card .kpi-rank {
   margin-top: 0;
   white-space: nowrap;
@@ -352,6 +465,9 @@ input[type='checkbox']{
 .villain-focus-table-wrap {
   max-width: 980px;
   margin: 0 auto;
+}
+.villain-focus-table-wrap--wide {
+  max-width: none;
 }
 .villain-focus-table-wrap table.dataTable { width: 100% !important; }
 .villain-focus-players-card {
